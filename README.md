@@ -209,16 +209,18 @@ Rules utama:
 - Suit dari kecil ke besar: diamonds, clubs, hearts, spades.
 - Straight tidak boleh memakai `2`; `A-2-3-4-5` tidak valid.
 - Pola ronde mengikuti pembuka ronde sampai table clear.
+- Untuk pair dan three of a kind, bot otomatis skip pemain yang tidak punya kombinasi lebih tinggi.
 - Kombinasi 5 kartu dari kecil ke besar: straight, flush, full house, four of a kind, straight flush, royal flush.
 - Four of a kind adalah 4 kartu rank sama dan bisa mengalahkan full house.
 - Four of a kind, straight flush, dan royal flush dianggap bombcard pada ladder kombinasi besar.
+- Four of a kind + 1 kartu random bisa dipakai sebagai bomb untuk mengalahkan single kartu `2`.
 - Game bisa memiliki 1-3 winner; loser adalah pemain terakhir yang masih punya kartu atau pemain yang terkena bombcard.
 - Jika ada pemain mendapat empat kartu `2`, game otomatis redeal.
 
 Panel Remi Poker memakai tombol:
 
 - **Ikut Main** untuk masuk lobby.
-- Dropdown **Pilih timer auto-pass** untuk memilih 30, 45, atau 60 detik sebelum game mulai.
+- Dropdown **Pilih timer auto-pass** untuk memilih 45 atau 60 detik sebelum game mulai.
 - **Mulai Game** untuk deal dan mulai.
 - **Lihat / Mainkan Kartu** untuk melihat kartu private dan memilih 1-5 kartu.
 - **Pass** untuk melewati giliran.

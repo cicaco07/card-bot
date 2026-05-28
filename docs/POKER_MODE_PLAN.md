@@ -52,7 +52,7 @@ Fitur MVP:
 - Lobby dengan panel rules.
 - Pemain 2-4 orang.
 - Tombol `Ikut Main`, `Mulai Game`, `Lihat / Mainkan Kartu`, `Pass`, `Refresh Meja`, `Vote End Game`.
-- Select timer auto-pass saat lobby: 30, 45, atau 60 detik.
+- Select timer auto-pass saat lobby: 45 atau 60 detik.
 - Deck 52 kartu tanpa joker.
 - Kartu rank `3` hanya dipakai untuk menentukan first turn, lalu dibuang dari semua hand.
 - Angka terendah yang bisa dimainkan adalah `4`.
@@ -235,6 +235,7 @@ royal_flush
 Catatan:
 
 - `four_of_a_kind` adalah 4 kartu rank sama.
+- `four_of_a_kind + kicker` adalah 4 kartu rank sama + 1 kartu random dan bisa dipakai sebagai bomb untuk mengalahkan single kartu `2`.
 - `royal_flush` adalah `10-J-Q-K-A` satu suit.
 - `four_of_a_kind`, `straight_flush`, dan `royal_flush` adalah bombcard.
 
@@ -269,6 +270,14 @@ Contoh:
 - Jika ronde dibuka dengan kombinasi 5 kartu, semua pemain hanya boleh melawan dengan kombinasi 5 kartu yang lebih tinggi.
 
 Jika dalam satu putaran tidak ada pemain yang bisa memberi kartu lebih besar, table clear. Pemain yang terakhir memainkan kartu berhak membuka ronde baru dengan pola apa pun.
+
+Auto-skip:
+
+- Untuk pola pair dan three of a kind, engine mengecek kombinasi tangan pemain berikutnya.
+- Jika pemain berikutnya tidak punya kombinasi yang bisa mengalahkan last play, pemain itu otomatis pass.
+- Auto-skip berjalan sampai ditemukan pemain yang bisa melawan.
+- Jika semua pemain lain tidak bisa melawan, table langsung clear dan last play owner membuka ronde baru.
+- Pola single dan kombinasi 5 kartu tidak memakai auto-skip agar pemain tetap punya ruang memilih strategi.
 
 ## Perbandingan Kombinasi
 

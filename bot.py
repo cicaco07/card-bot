@@ -335,13 +335,14 @@ def poker_state_text(session: PokerSession) -> str:
     vote_text = f"{session.end_vote_count}/{session.end_vote_required} setuju"
     current_player = mention(state["current_player_id"]) if state["current_player_id"] else "-"
     last_player = mention(state["last_play_player_id"]) if state["last_play_player_id"] else "-"
+    last_play_suffix = " (ronde sebelumnya, table sudah clear)" if state["table_cleared"] else ""
 
     return (
         "**Remi Poker: Game Berjalan**\n"
         f"Gilirannya: {current_player}\n"
         f"Timer auto-pass: **{session.timer_seconds} detik**\n"
         f"Pola ronde: **{state['round_pattern']}**\n"
-        f"Kombinasi terakhir: **{state['last_play']}**\n"
+        f"Kombinasi terakhir: **{state['last_play']}**{last_play_suffix}\n"
         f"Dimainkan oleh: {last_player}\n"
         f"Pass ronde ini: {state['pass_count']}\n\n"
         f"Jumlah kartu pemain:\n{hand_counts}\n\n"
@@ -387,7 +388,7 @@ def poker_rules_embed() -> discord.Embed:
             "- Joker tidak dipakai.\n"
             "- Kartu 3 hanya menentukan first turn, lalu dibuang.\n"
             "- Rank playable terendah adalah 4, tertinggi adalah 2.\n"
-            "- Timer auto-pass bisa dipilih di lobby: 30, 45, atau 60 detik."
+            "- Timer auto-pass bisa dipilih di lobby: 45 atau 60 detik."
         ),
         inline=False,
     )
@@ -436,12 +437,13 @@ def poker_table_view(session: PokerSession) -> discord.ui.View:
 def poker_table_visuals(session: PokerSession) -> tuple[discord.Embed | None, list[discord.File]]:
     if session.game.status == PokerStatus.WAITING:
         return poker_rules_embed(), []
-    if session.game.status != PokerStatus.PLAYING or session.game.last_play is None:
+    if session.game.status != PokerStatus.PLAYING or session.game.visible_last_play is None:
         return None, []
 
-    buffer, filename = render_play_image(list(session.game.last_play.cards), "poker_last_play.jpg")
+    visible_last_play = session.game.visible_last_play
+    buffer, filename = render_play_image(list(visible_last_play.cards), "poker_last_play.jpg")
     file = discord.File(buffer, filename=filename)
-    embed = discord.Embed(title="Kombinasi Terakhir", description=session.game.last_play.label)
+    embed = discord.Embed(title="Kombinasi Terakhir", description=visible_last_play.label)
     embed.set_image(url=f"attachment://{filename}")
     return embed, [file]
 
@@ -715,7 +717,6 @@ class PokerTimerSelect(discord.ui.Select):
     def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
         options = [
-            discord.SelectOption(label="30 detik", value="30", description="Auto-pass cepat"),
             discord.SelectOption(label="45 detik", value="45", description="Auto-pass standar"),
             discord.SelectOption(label="60 detik", value="60", description="Auto-pass lebih santai"),
         ]
@@ -1231,11 +1232,20 @@ class PokerHandView(discord.ui.View):
             session = get_poker_session(self.channel_id)
             result = session.game.play_cards(self.user_id, sorted(self.selected_numbers))
             add_poker_result_log(session, result.public_messages)
+            total_cards = len(session.game.hand_for(self.user_id))
+            max_page = max(0, (total_cards - 1) // self.page_size)
+            page = min(self.page, max_page)
+            selected_numbers: set[int] = set()
+            embed, files = poker_hand_visuals(session.game, self.user_id, page, self.page_size, selected_numbers)
+            action_text = "\n".join(result.public_messages)
             await interaction.response.edit_message(
-                content="\n".join(result.public_messages),
-                embed=None,
-                attachments=[],
-                view=None,
+                content=(
+                    f"{action_text}\n\n"
+                    f"{poker_hand_text(session.game, self.user_id, page, self.page_size, selected_numbers)}"
+                ),
+                embed=embed,
+                attachments=files,
+                view=PokerHandView(self.channel_id, self.user_id, page, selected_numbers),
             )
             await refresh_poker_table_message(session)
         except PokerGameError as error:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import itertools
 import random
 from typing import Literal
 
@@ -116,6 +117,8 @@ class PokerGame:
         self.turn_index = 0
         self.last_play: PokerCombination | None = None
         self.last_play_player_id: int | None = None
+        self.cleared_last_play: PokerCombination | None = None
+        self.cleared_last_play_player_id: int | None = None
         self.round_pattern: str | None = None
         self.passed_user_ids: set[int] = set()
         self.winner_ids: list[int] = []
@@ -208,6 +211,8 @@ class PokerGame:
 
         self.last_play = combination
         self.last_play_player_id = player.user_id
+        self.cleared_last_play = None
+        self.cleared_last_play_player_id = None
         self.round_pattern = combination.pattern
         self.passed_user_ids.clear()
 
@@ -231,8 +236,7 @@ class PokerGame:
         if self._finish_if_only_one_loser_left(messages):
             return PokerActionResult(messages, self.winner_ids, self.loser_id)
 
-        self._advance_to_next_active_player()
-        messages.append(f"Giliran berikutnya: {self.current_player.name}.")
+        self._advance_to_next_contender(messages)
         return PokerActionResult(messages, self.winner_ids, self.loser_id)
 
     def pass_turn(self, user_id: int) -> PokerActionResult:
@@ -259,8 +263,7 @@ class PokerGame:
             self.passed_user_ids.clear()
             messages.append(f"Table clear. {starter.name} membuka ronde baru.")
         else:
-            self._advance_to_next_active_player()
-            messages.append(f"Giliran berikutnya: {self.current_player.name}.")
+            self._advance_to_next_contender(messages)
 
         return PokerActionResult(messages, self.winner_ids, self.loser_id)
 
@@ -295,8 +298,9 @@ class PokerGame:
             "current_player_id": current_player_id,
             "current_player_name": current_player_name,
             "round_pattern": self.round_pattern or "bebas",
-            "last_play": self.last_play.label if self.last_play else "Belum ada",
-            "last_play_player_id": self.last_play_player_id,
+            "last_play": self.visible_last_play.label if self.visible_last_play else "Belum ada",
+            "last_play_player_id": self.visible_last_play_player_id,
+            "table_cleared": self.last_play is None and self.cleared_last_play is not None,
             "hand_counts": [
                 (player.user_id, player.name, len(player.hand), player.finished, player.eliminated_by_bomb)
                 for player in self.players
@@ -309,6 +313,8 @@ class PokerGame:
 
     def _validate_play(self, combination: PokerCombination) -> None:
         if self.last_play is None:
+            return
+        if self._is_single_two_bomb_override(combination):
             return
         if combination.pattern != self.round_pattern:
             raise PokerGameError(f"Pola ronde saat ini adalah {self.round_pattern}.")
@@ -341,6 +347,96 @@ class PokerGame:
             self.turn_index = (self.turn_index + 1) % len(self.players)
             if self.players[self.turn_index].user_id in active_ids:
                 return
+
+    def _advance_to_next_contender(self, messages: list[str]) -> None:
+        if not self._should_auto_skip_check():
+            self._advance_to_next_active_player()
+            messages.append(f"Giliran berikutnya: {self.current_player.name}.")
+            return
+
+        last_player = self._require_player(self.last_play_player_id)
+        active_ids = {player.user_id for player in self.active_players()}
+        start_index = self.players.index(last_player)
+
+        for step in range(1, len(self.players) + 1):
+            index = (start_index + step) % len(self.players)
+            candidate = self.players[index]
+            if candidate.user_id not in active_ids:
+                continue
+
+            if candidate.user_id == self.last_play_player_id:
+                self._clear_table_for_starter(candidate, messages)
+                return
+
+            if candidate.user_id in self.passed_user_ids:
+                continue
+
+            if self._player_can_beat_last_play(candidate):
+                self.turn_index = index
+                messages.append(f"Giliran berikutnya: {candidate.name}.")
+                return
+
+            self.passed_user_ids.add(candidate.user_id)
+            messages.append(f"{candidate.name} auto-skip karena tidak punya kombinasi yang bisa mengalahkan.")
+
+        starter = self._set_turn_to_next_active_after(start_index)
+        self._clear_table_for_starter(starter, messages)
+
+    def _clear_table_for_starter(self, starter: PokerPlayer, messages: list[str]) -> None:
+        self.cleared_last_play = self.last_play
+        self.cleared_last_play_player_id = self.last_play_player_id
+        self.turn_index = self.players.index(starter)
+        self.last_play = None
+        self.last_play_player_id = None
+        self.round_pattern = None
+        self.passed_user_ids.clear()
+        messages.append(f"Table clear. {starter.name} membuka ronde baru.")
+
+    def _should_auto_skip_check(self) -> bool:
+        if self.last_play is None:
+            return False
+        return self.last_play.pattern in {"pair", "three_of_a_kind"}
+
+    @property
+    def visible_last_play(self) -> PokerCombination | None:
+        return self.last_play or self.cleared_last_play
+
+    @property
+    def visible_last_play_player_id(self) -> int | None:
+        return self.last_play_player_id or self.cleared_last_play_player_id
+
+    def _player_can_beat_last_play(self, player: PokerPlayer) -> bool:
+        if self.last_play is None:
+            return True
+
+        candidate_sizes = {
+            "pair": (2,),
+            "three_of_a_kind": (3,),
+        }.get(self.last_play.pattern, ())
+
+        for size in candidate_sizes:
+            if len(player.hand) < size:
+                continue
+            for cards in itertools.combinations(player.hand, size):
+                try:
+                    combination = evaluate_combination(list(cards))
+                    if (
+                        combination.pattern == self.last_play.pattern
+                        and compare_combinations(combination, self.last_play) > 0
+                    ):
+                        return True
+                except PokerGameError:
+                    continue
+        return False
+
+    def _is_single_two_bomb_override(self, combination: PokerCombination) -> bool:
+        if self.last_play is None:
+            return False
+        if self.last_play.kind != "single":
+            return False
+        if self.last_play.cards[0].rank != "2":
+            return False
+        return combination.kind == "four_of_a_kind"
 
     def _set_turn_to_next_active_after(self, start_index: int) -> PokerPlayer:
         active_ids = {player.user_id for player in self.active_players()}
@@ -376,6 +472,8 @@ class PokerGame:
         self.turn_index = 0
         self.last_play = None
         self.last_play_player_id = None
+        self.cleared_last_play = None
+        self.cleared_last_play_player_id = None
         self.round_pattern = None
         self.passed_user_ids.clear()
         self.winner_ids.clear()
@@ -485,6 +583,16 @@ def evaluate_combination(cards: list[PokerCard]) -> PokerCombination:
 
     if is_flush and is_straight:
         return PokerCombination("straight_flush", tuple(sorted_cards), (4, *straight_info), _cards_label("Straight Flush", sorted_cards))
+
+    if counts == [4, 1]:
+        quad_rank = next(rank for rank, amount in rank_counts.items() if amount == 4)
+        high_suit = max(card.suit_value for card in sorted_cards if card.rank == quad_rank)
+        return PokerCombination(
+            "four_of_a_kind",
+            tuple(sorted_cards),
+            (3, PLAYABLE_RANK_VALUES[quad_rank], high_suit),
+            _cards_label("Four of a Kind Bomb", sorted_cards),
+        )
 
     if counts == [3, 2]:
         triple_rank = next(rank for rank, amount in rank_counts.items() if amount == 3)
