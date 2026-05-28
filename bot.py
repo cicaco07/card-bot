@@ -36,12 +36,30 @@ class UnoSession:
     game: UnoGame = field(default_factory=UnoGame)
     table_message_id: int | None = None
     log: list[str] = field(default_factory=list)
+    end_game_votes: set[int] = field(default_factory=set)
 
     def add_log(self, messages: list[str] | str) -> None:
         if isinstance(messages, str):
             messages = [messages]
-        self.log.extend(messages)
-        self.log = self.log[-8:]
+        # Keep the table calm: show only the latest action, not a growing chat log.
+        self.log = messages[-3:]
+
+    @property
+    def end_vote_required(self) -> int:
+        return (len(self.game.players) // 2) + 1
+
+    @property
+    def end_vote_count(self) -> int:
+        player_ids = {player.user_id for player in self.game.players}
+        self.end_game_votes.intersection_update(player_ids)
+        return len(self.end_game_votes)
+
+    def add_end_vote(self, user_id: int) -> tuple[int, int, bool]:
+        require_session_player(self, user_id)
+        self.end_game_votes.add(user_id)
+        votes = self.end_vote_count
+        required = self.end_vote_required
+        return votes, required, votes >= required
 
 
 def require_channel_id(interaction: discord.Interaction) -> int:
@@ -57,6 +75,11 @@ def get_session(channel_id: int | None) -> UnoSession:
     if session is None:
         raise UnoGameError("Belum ada meja UNO di channel ini. Gunakan /uno_start untuk membuat panel.")
     return session
+
+
+def require_session_player(session: UnoSession, user_id: int) -> None:
+    if session.game.get_player(user_id) is None:
+        raise UnoGameError("Hanya pemain yang ikut lobby/game ini yang boleh melakukan aksi tersebut.")
 
 
 def mention(user_id: int) -> str:
@@ -82,7 +105,14 @@ def public_state_text(session: UnoSession) -> str:
         f"- {mention(user_id)}: {count} kartu"
         for user_id, _name, count in state["hand_counts"]
     )
-    log_text = "\n".join(f"- {message}" for message in session.log[-5:]) or "- Belum ada aksi."
+    uno_pending = "\n".join(
+        f"- {mention(user_id)} wajib tekan **UNO!**. Pemain lain bisa menekan **Challenge UNO**."
+        for user_id, _name in state["uno_pending"]
+    )
+    if not uno_pending:
+        uno_pending = "- Tidak ada."
+    action_text = "\n".join(f"- {message}" for message in session.log[:2]) or "- Belum ada aksi."
+    vote_text = f"{session.end_vote_count}/{session.end_vote_required} setuju"
     return (
         "**UNO Table: Game Berjalan**\n"
         "Kartu aktif ada pada gambar di bawah.\n"
@@ -91,7 +121,9 @@ def public_state_text(session: UnoSession) -> str:
         f"Arah: {state['direction']}\n"
         f"Sisa deck: {state['deck_count']} kartu\n\n"
         f"Jumlah kartu pemain:\n{hand_counts}\n\n"
-        f"Log terakhir:\n{log_text}"
+        f"Status UNO:\n{uno_pending}\n\n"
+        f"Vote akhiri game: **{vote_text}**\n\n"
+        f"Aksi terakhir:\n{action_text}"
     )
 
 
@@ -126,7 +158,75 @@ def hand_text(game: UnoGame, user_id: int, page: int = 0, page_size: int = 25) -
     )
 
 
+def rules_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Rules UNO Reguler",
+        description="Baca dulu sebelum ikut bermain. Versi ini dibuat sederhana agar ritme game tetap cepat.",
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name="Tujuan",
+        value="Habiskan semua kartu di tanganmu. Pemain yang kartunya habis pertama menang.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Yang Harus Dilakukan",
+        value=(
+            "- Mainkan kartu yang cocok dengan warna aktif atau angka/aksi kartu aktif.\n"
+            "- Gunakan kartu Change Color untuk mengganti warna.\n"
+            "- Ambil kartu jika tidak ada kartu yang bisa dimainkan.\n"
+            "- Pass hanya jika tidak punya kartu yang bisa dimainkan.\n"
+            "- Tekan tombol UNO! saat kartumu tersisa tepat 1.\n"
+            "- Challenge pemain lain yang lupa menekan UNO sebelum mereka sempat menekannya."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Yang Tidak Boleh Dilakukan",
+        value=(
+            "- Jangan melihat atau meminta screenshot kartu pemain lain.\n"
+            "- Jangan spam tombol draw/pass/refresh.\n"
+            "- Jangan sengaja memperlambat giliran terlalu lama.\n"
+            "- Jangan memulai lobby baru saat game di channel masih berjalan."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Kartu Special",
+        value=(
+            "**Stop/Skip** melewati pemain berikutnya.\n"
+            "**Reverse** membalik arah permainan. Pada 2 pemain, Reverse bertindak seperti Stop.\n"
+            "**+2** membuat pemain berikutnya mengambil 2 kartu dan dilewati.\n"
+            "**Change Color** memilih warna baru.\n"
+            "**Change Color +4** memilih warna baru, pemain berikutnya mengambil 4 kartu dan dilewati."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Rule Tombol UNO!",
+        value=(
+            "Jika setelah memainkan kartu kamu tersisa 1 kartu, kamu wajib menekan tombol **UNO!**. "
+            "Kamu tidak bisa memainkan kartu terakhir sebelum tombol UNO! ditekan. Jika pemain lain menekan "
+            "**Challenge UNO** lebih dulu, kamu mengambil 2 kartu penalti."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Batasan Versi Ini",
+        value=(
+            "Belum ada stacking +2/+4 dan belum ada challenge +4. Challenge UNO hanya berlaku untuk pemain "
+            "yang sedang tersisa 1 kartu dan belum menekan UNO."
+        ),
+        inline=False,
+    )
+    embed.set_footer(text="Klik Ikut Main jika setuju mengikuti rules meja ini.")
+    return embed
+
+
 def table_visuals(session: UnoSession) -> tuple[discord.Embed | None, list[discord.File]]:
+    if session.game.status == GameStatus.WAITING:
+        return rules_embed(), []
+
     if session.game.status != GameStatus.PLAYING:
         return None, []
 
@@ -164,33 +264,47 @@ async def reply_error(interaction: discord.Interaction, error: Exception) -> Non
 
 
 async def refresh_table_message(session: UnoSession) -> None:
-    if session.table_message_id is None:
+    await repost_table_message(session)
+
+
+async def repost_table_message(session: UnoSession) -> None:
+    channel = bot.get_channel(session.channel_id)
+    if not hasattr(channel, "send"):
         return
+
+    old_message_id = session.table_message_id
+    embed, files = table_visuals(session)
+    message = await channel.send(content=table_text(session), view=table_view(session), embed=embed, files=files)
+    session.table_message_id = message.id
+
+    if old_message_id is not None:
+        await delete_table_message(session, old_message_id)
+
+
+async def delete_table_message(session: UnoSession, message_id: int) -> None:
     channel = bot.get_channel(session.channel_id)
     if not hasattr(channel, "fetch_message"):
         return
-    message = await channel.fetch_message(session.table_message_id)
-    embed, files = table_visuals(session)
-    await message.edit(content=table_text(session), view=table_view(session), embed=embed, attachments=files)
-
-
-async def edit_table_from_interaction(interaction: discord.Interaction, session: UnoSession) -> None:
-    content = table_text(session)
-    view = table_view(session)
-    embed, files = table_visuals(session)
-
-    if interaction.message and interaction.message.id == session.table_message_id:
-        if interaction.response.is_done():
-            await interaction.message.edit(content=content, view=view, embed=embed, attachments=files)
-        else:
-            await interaction.response.edit_message(content=content, view=view, embed=embed, attachments=files)
+    try:
+        old_message = await channel.fetch_message(message_id)
+        await old_message.delete()
+    except (discord.Forbidden, discord.HTTPException, discord.NotFound):
         return
 
-    await refresh_table_message(session)
+
+async def update_table_from_interaction(interaction: discord.Interaction, session: UnoSession) -> None:
+    if not interaction.response.is_done():
+        await interaction.response.defer()
+    await repost_table_message(session)
 
 
 def add_result_log(session: UnoSession, messages: list[str]) -> None:
-    clean_messages = [message for message in messages if message]
+    session.end_game_votes.clear()
+    clean_messages = [
+        message
+        for message in messages
+        if message and not message.startswith("Giliran berikutnya:")
+    ]
     session.add_log(clean_messages)
 
 
@@ -213,7 +327,7 @@ class LobbyView(discord.ui.View):
             session = get_session(self.channel_id)
             session.game.add_player(interaction.user.id, interaction.user.display_name)
             session.add_log(f"{interaction.user.display_name} masuk lobby.")
-            await edit_table_from_interaction(interaction, session)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -223,7 +337,7 @@ class LobbyView(discord.ui.View):
             session = get_session(self.channel_id)
             messages = session.game.start()
             session.add_log(messages)
-            await edit_table_from_interaction(interaction, session)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -231,12 +345,17 @@ class LobbyView(discord.ui.View):
     async def close_lobby(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_session(self.channel_id)
+            require_session_player(session, interaction.user.id)
             sessions_by_channel.pop(self.channel_id, None)
             content = f"**UNO Table ditutup** oleh {interaction.user.mention}."
-            if interaction.response.is_done():
-                await interaction.followup.send(content)
-            else:
-                await interaction.response.edit_message(content=content, view=None)
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            old_message_id = session.table_message_id
+            channel = bot.get_channel(session.channel_id)
+            if hasattr(channel, "send"):
+                await channel.send(content)
+            if old_message_id is not None:
+                await delete_table_message(session, old_message_id)
             session.table_message_id = None
         except UnoGameError as error:
             await reply_error(interaction, error)
@@ -265,7 +384,7 @@ class FinishedView(discord.ui.View):
             if old_session:
                 session.table_message_id = old_session.table_message_id
             sessions_by_channel[self.channel_id] = session
-            await edit_table_from_interaction(interaction, session)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -305,8 +424,7 @@ class GameView(discord.ui.View):
             session = get_session(self.channel_id)
             result = session.game.draw_card(interaction.user.id)
             add_result_log(session, result.public_messages)
-            await edit_table_from_interaction(interaction, session)
-            await interaction.followup.send("\n".join(result.public_messages), ephemeral=True)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -316,26 +434,68 @@ class GameView(discord.ui.View):
             session = get_session(self.channel_id)
             result = session.game.pass_turn(interaction.user.id)
             add_result_log(session, result.public_messages)
-            await edit_table_from_interaction(interaction, session)
-            await interaction.followup.send("\n".join(result.public_messages), ephemeral=True)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
-    @discord.ui.button(label="Refresh Meja", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="UNO!", style=discord.ButtonStyle.success, row=1)
+    async def call_uno(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_session(self.channel_id)
+            result = session.game.call_uno(interaction.user.id)
+            add_result_log(session, result.public_messages)
+            await update_table_from_interaction(interaction, session)
+        except UnoGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Challenge UNO", style=discord.ButtonStyle.danger, row=1)
+    async def challenge_uno(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_session(self.channel_id)
+            pending_players = [
+                (user_id, name)
+                for user_id, name in session.game.public_state()["uno_pending"]
+                if user_id != interaction.user.id
+            ]
+            if len(pending_players) > 1:
+                await interaction.response.send_message(
+                    "Pilih pemain yang lupa menekan UNO:",
+                    view=ChallengeUnoView(self.channel_id, interaction.user.id),
+                    ephemeral=True,
+                )
+                return
+
+            target_user_id = pending_players[0][0] if pending_players else None
+            result = session.game.challenge_uno(interaction.user.id, target_user_id)
+            add_result_log(session, result.public_messages)
+            await update_table_from_interaction(interaction, session)
+        except UnoGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Refresh Meja", style=discord.ButtonStyle.secondary, row=2)
     async def refresh(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_session(self.channel_id)
-            await edit_table_from_interaction(interaction, session)
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
-    @discord.ui.button(label="Akhiri Game", style=discord.ButtonStyle.danger, row=1)
-    async def end_game(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+    @discord.ui.button(label="Vote End Game", style=discord.ButtonStyle.danger, row=2)
+    async def vote_end_game(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_session(self.channel_id)
-            session.game.status = GameStatus.FINISHED
-            session.add_log(f"Game diakhiri oleh {interaction.user.display_name}.")
-            await edit_table_from_interaction(interaction, session)
+            votes, required, approved = session.add_end_vote(interaction.user.id)
+            if approved:
+                session.game.status = GameStatus.FINISHED
+                session.end_game_votes.clear()
+                session.add_log(
+                    f"Vote end game disetujui {votes}/{required}. Game diakhiri."
+                )
+            else:
+                session.add_log(
+                    f"{interaction.user.display_name} vote end game ({votes}/{required})."
+                )
+            await update_table_from_interaction(interaction, session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -395,15 +555,75 @@ class CardSelect(discord.ui.Select):
 
             result = session.game.play_card(self.user_id, card_number)
             add_result_log(session, result.public_messages)
-            await refresh_table_message(session)
             await interaction.response.edit_message(
                 content="\n".join(result.public_messages),
                 embed=None,
                 attachments=[],
                 view=None,
             )
+            await refresh_table_message(session)
         except UnoGameError as error:
             await reply_error(interaction, error)
+
+
+class ChallengeTargetSelect(discord.ui.Select):
+    def __init__(self, channel_id: int, challenger_user_id: int) -> None:
+        self.channel_id = channel_id
+        self.challenger_user_id = challenger_user_id
+        session = get_session(channel_id)
+        pending_players = [
+            (user_id, name)
+            for user_id, name in session.game.public_state()["uno_pending"]
+            if user_id != challenger_user_id
+        ]
+        options = [
+            discord.SelectOption(
+                label=name[:100],
+                description="Lupa menekan UNO",
+                value=str(user_id),
+            )
+            for user_id, name in pending_players
+        ]
+        if not options:
+            options = [discord.SelectOption(label="Tidak ada target", value="empty")]
+
+        super().__init__(
+            placeholder="Pilih target Challenge UNO",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            if interaction.user.id != self.challenger_user_id:
+                raise UnoGameError("Ini panel challenge pemain lain.")
+            if self.values[0] == "empty":
+                raise UnoGameError("Tidak ada target Challenge UNO saat ini.")
+
+            session = get_session(self.channel_id)
+            result = session.game.challenge_uno(interaction.user.id, int(self.values[0]))
+            add_result_log(session, result.public_messages)
+            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
+            await refresh_table_message(session)
+        except UnoGameError as error:
+            await reply_error(interaction, error)
+
+
+class ChallengeUnoView(discord.ui.View):
+    def __init__(self, channel_id: int, challenger_user_id: int) -> None:
+        super().__init__(timeout=60)
+        self.channel_id = channel_id
+        self.challenger_user_id = challenger_user_id
+        self.add_item(ChallengeTargetSelect(channel_id, challenger_user_id))
+
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        _item: discord.ui.Item,
+    ) -> None:
+        await reply_error(interaction, error)
 
 
 class HandView(discord.ui.View):
@@ -499,13 +719,13 @@ class ColorPickView(discord.ui.View):
             session = get_session(self.channel_id)
             result = session.game.play_card(self.user_id, self.card_number, color)
             add_result_log(session, result.public_messages)
-            await refresh_table_message(session)
             await interaction.response.edit_message(
                 content="\n".join(result.public_messages),
                 embed=None,
                 attachments=[],
                 view=None,
             )
+            await refresh_table_message(session)
         except UnoGameError as error:
             await reply_error(interaction, error)
 

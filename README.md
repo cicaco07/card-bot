@@ -82,6 +82,7 @@ Slash command hanya dipakai sekali untuk membuat meja:
 
 Setelah itu bot akan mengirim panel **UNO Table** di channel. Semua aksi utama bisa dilakukan lewat tombol:
 
+- Panel awal menampilkan **Rules UNO Reguler** yang harus dibaca sebelum ikut bermain.
 - **Ikut Main** untuk masuk lobby.
 - **Mulai Game** untuk membagikan kartu dan memulai permainan.
 - **Lihat / Mainkan Kartu** untuk membuka kartu tanganmu secara private.
@@ -91,10 +92,20 @@ Setelah itu bot akan mengirim panel **UNO Table** di channel. Semua aksi utama b
 - Jika memilih kartu **Change Color**, bot akan menampilkan tombol pilihan warna.
 - **Ambil Kartu** untuk draw 1 kartu.
 - **Pass** untuk melewati giliran jika tidak ada kartu yang bisa dimainkan.
+- **UNO!** wajib ditekan saat kartumu tersisa tepat 1 kartu.
+- **Challenge UNO** untuk menghukum pemain lain yang tersisa 1 kartu tetapi belum menekan **UNO!**.
 - **Refresh Meja** untuk memperbarui tampilan meja.
-- **Akhiri Game** untuk menyelesaikan game.
+- **Vote End Game** untuk mengusulkan game selesai lebih awal.
 
 Isi kartu pemain tidak muncul di channel publik. Setiap pemain melihat kartunya sendiri lewat ephemeral message, yaitu pesan Discord yang hanya terlihat oleh pemain tersebut.
+
+Jika setelah memainkan kartu kamu tersisa 1 kartu, meja akan menampilkan status bahwa kamu wajib menekan **UNO!**. Kamu tidak bisa memainkan kartu terakhir sebelum tombol **UNO!** ditekan. Jika pemain lain menekan **Challenge UNO** lebih dulu, kamu mengambil 2 kartu penalti.
+
+Panel meja hanya menampilkan **Aksi terakhir** agar tidak penuh log lama. Aksi tombol seperti draw, pass, UNO, dan challenge langsung memperbarui panel meja tanpa mengirim popup sukses tambahan yang harus di-dismiss.
+
+Setiap kali state meja berubah, bot mengirim ulang panel utama sebagai pesan terbaru lalu menghapus panel lama. Ini membuat pemain tidak perlu scroll ke atas untuk melihat kartu aktif, giliran saat ini, dan jumlah kartu pemain.
+
+Game hanya selesai lebih awal jika vote **lebih dari 50% pemain** menyetujui. Contoh: 2 pemain butuh 2 vote, 3 pemain butuh 2 vote, 4 pemain butuh 3 vote. Vote akan di-reset jika game berjalan lagi lewat aksi normal seperti draw, pass, play card, UNO, atau challenge.
 
 ## Asset Kartu
 
@@ -133,10 +144,15 @@ Implementasi ini sengaja dibuat sederhana supaya enak dikembangkan:
 
 - Tidak ada challenge untuk Change Color +4.
 - Tidak ada stacking +2/+4.
-- Tidak ada tombol "UNO" ketika sisa 1 kartu.
+- Tombol **UNO!** wajib ditekan saat pemain tersisa 1 kartu.
+- **Challenge UNO** memberi penalti +2 kepada pemain yang tersisa 1 kartu tetapi belum menekan **UNO!**.
 - Reverse pada 2 pemain dianggap seperti Stop.
 - State game masih in-memory, jadi game hilang jika bot restart.
 - Tombol pada pesan lama tidak bisa dipakai lagi setelah bot restart karena state game juga hilang.
+- Tombol **Tutup Lobby** hanya bisa dipakai oleh pemain yang ikut lobby.
+- Tombol **Vote End Game** hanya mencatat suara pemain yang ikut game.
+
+Saat `/uno_start` dijalankan, bot menampilkan panel rules di lobby. Rules ini otomatis diganti menjadi gambar kartu aktif saat game dimulai.
 
 ## Arah Pengembangan
 

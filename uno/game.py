@@ -79,6 +79,7 @@ class UnoGame:
         self.current_color: Color | None = None
         self.turn_index = 0
         self.direction = 1
+        self.pending_uno_user_ids: set[int] = set()
 
     def add_player(self, user_id: int, name: str) -> None:
         if self.status != GameStatus.WAITING:
@@ -106,6 +107,7 @@ class UnoGame:
         self.current_color = first_card.color
         self.turn_index = 0
         self.direction = 1
+        self.pending_uno_user_ids.clear()
         self.status = GameStatus.PLAYING
 
         return [
@@ -162,6 +164,8 @@ class UnoGame:
             raise UnoGameError("Kartu Change Color butuh pilihan warna: red, yellow, green, atau blue.")
         if not card.is_wild and chosen_color is not None:
             raise UnoGameError("Pilihan warna hanya dipakai untuk kartu Change Color.")
+        if len(player.hand) == 1 and player.user_id in self.pending_uno_user_ids:
+            raise UnoGameError("Kamu harus menekan tombol UNO! dulu sebelum memainkan kartu terakhir.")
 
         player.hand.pop(card_number - 1)
         self.discard_pile.append(card)
@@ -172,9 +176,16 @@ class UnoGame:
             messages.append(f"Warna diganti menjadi {COLOR_LABELS[self.current_color]}.")
 
         if not player.hand:
+            self.pending_uno_user_ids.discard(player.user_id)
             self.status = GameStatus.FINISHED
             messages.append(f"{player.name} menang. GG, meja virtual bergetar.")
             return PlayResult(messages, winner_id=player.user_id)
+
+        if len(player.hand) == 1:
+            self.pending_uno_user_ids.add(player.user_id)
+            messages.append(f"{player.name} tersisa 1 kartu dan harus menekan tombol UNO!")
+        else:
+            self.pending_uno_user_ids.discard(player.user_id)
 
         messages.extend(self._apply_card_effect(card))
         if self.status == GameStatus.PLAYING:
@@ -186,6 +197,7 @@ class UnoGame:
         player = self.current_player
         card = self._draw_one()
         player.hand.append(card)
+        self.pending_uno_user_ids.discard(player.user_id)
 
         messages = [f"{player.name} mengambil 1 kartu."]
         if self.can_play(card):
@@ -203,6 +215,50 @@ class UnoGame:
         self._advance_turn()
         return PlayResult([f"{player.name} pass.", f"Giliran berikutnya: {self.current_player.name}."])
 
+    def call_uno(self, user_id: int) -> PlayResult:
+        self._ensure_playing()
+        player = self._require_player(user_id)
+        if len(player.hand) != 1:
+            raise UnoGameError("Tombol UNO! hanya bisa ditekan saat kamu tersisa tepat 1 kartu.")
+        if player.user_id not in self.pending_uno_user_ids:
+            raise UnoGameError("Kamu sudah menekan UNO! untuk kartu terakhir ini.")
+
+        self.pending_uno_user_ids.discard(player.user_id)
+        return PlayResult([f"{player.name} menekan tombol UNO!"])
+
+    def challenge_uno(self, challenger_user_id: int, target_user_id: int | None = None) -> PlayResult:
+        self._ensure_playing()
+        challenger = self._require_player(challenger_user_id)
+        pending_players = [
+            player
+            for player in self.players
+            if player.user_id in self.pending_uno_user_ids and len(player.hand) == 1
+        ]
+        if not pending_players:
+            raise UnoGameError("Tidak ada pemain yang bisa di-challenge. Semua aman, meja tenang.")
+
+        if target_user_id is None:
+            if len(pending_players) > 1:
+                raise UnoGameError("Ada lebih dari satu pemain yang belum UNO. Pilih target challenge.")
+            target = pending_players[0]
+        else:
+            target = self._require_player(target_user_id)
+            if target not in pending_players:
+                raise UnoGameError("Target itu tidak sedang lupa menekan UNO.")
+
+        if challenger.user_id == target.user_id:
+            raise UnoGameError("Kamu tidak bisa challenge diri sendiri. Tekan UNO! saja, lebih elegan.")
+
+        penalty_cards = [self._draw_one() for _ in range(2)]
+        target.hand.extend(penalty_cards)
+        self.pending_uno_user_ids.discard(target.user_id)
+        return PlayResult(
+            [
+                f"{challenger.name} berhasil challenge UNO terhadap {target.name}.",
+                f"{target.name} lupa menekan UNO! dan mengambil 2 kartu penalti.",
+            ]
+        )
+
     def public_state(self) -> dict[str, object]:
         self._ensure_playing()
         return {
@@ -212,6 +268,11 @@ class UnoGame:
             "current_player_id": self.current_player.user_id,
             "direction": "searah jarum jam" if self.direction == 1 else "berlawanan jarum jam",
             "hand_counts": [(player.user_id, player.name, len(player.hand)) for player in self.players],
+            "uno_pending": [
+                (player.user_id, player.name)
+                for player in self.players
+                if player.user_id in self.pending_uno_user_ids and len(player.hand) == 1
+            ],
             "deck_count": len(self.deck),
         }
 
@@ -235,12 +296,14 @@ class UnoGame:
             target = self._peek_next_player()
             drawn_cards = [self._draw_one() for _ in range(2)]
             target.hand.extend(drawn_cards)
+            self.pending_uno_user_ids.discard(target.user_id)
             self._advance_turn(2)
             messages.append(f"{target.name} mengambil 2 kartu dan dilewati.")
         elif card.value == "wild_draw4":
             target = self._peek_next_player()
             drawn_cards = [self._draw_one() for _ in range(4)]
             target.hand.extend(drawn_cards)
+            self.pending_uno_user_ids.discard(target.user_id)
             self._advance_turn(2)
             messages.append(f"{target.name} mengambil 4 kartu dan dilewati.")
         else:
