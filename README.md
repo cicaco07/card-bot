@@ -9,7 +9,8 @@ Saat ini bot hanya mendukung mode UNO reguler:
 - kartu special: Stop, Reverse, +2, Change Color, Change Color +4
 - game berjalan per channel dan disimpan di memory
 - meja game memakai tombol dan dropdown Discord
-- kartu tangan dikirim private lewat ephemeral message
+- gambar kartu diambil dari `assets/uno_regular`
+- kartu tangan dikirim sebagai gambar private lewat ephemeral message
 
 ## Membuat Bot di Discord Developer Portal
 
@@ -84,7 +85,9 @@ Setelah itu bot akan mengirim panel **UNO Table** di channel. Semua aksi utama b
 - **Ikut Main** untuk masuk lobby.
 - **Mulai Game** untuk membagikan kartu dan memulai permainan.
 - **Lihat / Mainkan Kartu** untuk membuka kartu tanganmu secara private.
-- Di panel private kartu tangan, pilih kartu dari dropdown untuk memainkannya.
+- Di panel private kartu tangan, bot menampilkan gambar grid kartu dari asset asli.
+- Nomor kecil di gambar kartu dipakai untuk memilih kartu dari dropdown.
+- Border hijau pada gambar kartu berarti kartu tersebut bisa dimainkan.
 - Jika memilih kartu **Change Color**, bot akan menampilkan tombol pilihan warna.
 - **Ambil Kartu** untuk draw 1 kartu.
 - **Pass** untuk melewati giliran jika tidak ada kartu yang bisa dimainkan.
@@ -92,6 +95,28 @@ Setelah itu bot akan mengirim panel **UNO Table** di channel. Semua aksi utama b
 - **Akhiri Game** untuk menyelesaikan game.
 
 Isi kartu pemain tidak muncul di channel publik. Setiap pemain melihat kartunya sendiri lewat ephemeral message, yaitu pesan Discord yang hanya terlihat oleh pemain tersebut.
+
+## Asset Kartu
+
+Bot membaca gambar kartu dari folder:
+
+```text
+assets/uno_regular
+```
+
+Format nama file yang dipakai:
+
+- `Red_0.jpg` sampai `Red_9.jpg`
+- `Red_Skip.jpg`
+- `Red_Reverse.jpg`
+- `Red_Draw_2.jpg`
+- format yang sama untuk `Yellow`, `Green`, dan `Blue`
+- `Wild.jpg`
+- `Wild_Draw_4.jpg`
+
+Renderer otomatis toleran terhadap beda huruf besar/kecil pada filename, misalnya `RED_Reverse.jpg`.
+
+Gambar current card di meja ditampilkan sebagai attachment embed Discord. Gambar kartu tangan dibuat sebagai grid sementara dari asset asli, lalu dikirim private ke pemain.
 
 ## Command Fallback
 

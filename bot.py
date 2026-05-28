@@ -7,6 +7,7 @@ import discord
 from discord import app_commands
 from dotenv import load_dotenv
 
+from uno.card_assets import render_card_image, render_hand_image
 from uno.game import COLOR_LABELS, GameStatus, UnoGame, UnoGameError
 
 
@@ -84,7 +85,7 @@ def public_state_text(session: UnoSession) -> str:
     log_text = "\n".join(f"- {message}" for message in session.log[-5:]) or "- Belum ada aksi."
     return (
         "**UNO Table: Game Berjalan**\n"
-        f"Top card: **{state['top_card']}**\n"
+        "Kartu aktif ada pada gambar di bawah.\n"
         f"Warna aktif: **{state['current_color']}**\n"
         f"Gilirannya: {mention(state['current_player_id'])}\n"
         f"Arah: {state['direction']}\n"
@@ -117,20 +118,41 @@ def table_view(session: UnoSession) -> discord.ui.View:
 
 def hand_text(game: UnoGame, user_id: int, page: int = 0, page_size: int = 25) -> str:
     cards = game.hand_for(user_id)
-    playable = set(game.playable_cards_for(user_id))
     total_pages = max(1, (len(cards) + page_size - 1) // page_size)
-    start = page * page_size
-    shown_cards = cards[start : start + page_size]
+    return (
+        "**Kartu tanganmu**\n"
+        f"Halaman {page + 1}/{total_pages}. Lihat gambar kartu di bawah, lalu pilih nomor kartu dari dropdown.\n"
+        "Border hijau berarti kartu tersebut bisa dimainkan."
+    )
 
-    lines = [
-        "**Kartu tanganmu**",
-        f"Halaman {page + 1}/{total_pages}. Kartu bertanda `bisa` cocok dengan meja saat ini.",
-        "",
-    ]
-    for offset, card in enumerate(shown_cards, start=start + 1):
-        marker = "bisa" if offset - 1 in playable else "tahan"
-        lines.append(f"{offset}. {card.label} ({marker})")
-    return "\n".join(lines) if shown_cards else "Tanganmu kosong."
+
+def table_visuals(session: UnoSession) -> tuple[discord.Embed | None, list[discord.File]]:
+    if session.game.status != GameStatus.PLAYING:
+        return None, []
+
+    buffer, filename = render_card_image(session.game.top_card, "current_card.jpg")
+    file = discord.File(buffer, filename=filename)
+    embed = discord.Embed(
+        title="Kartu Aktif",
+        description=f"Warna aktif: **{COLOR_LABELS[session.game.current_color]}**",
+    )
+    embed.set_image(url=f"attachment://{filename}")
+    return embed, [file]
+
+
+def hand_visuals(
+    game: UnoGame,
+    user_id: int,
+    page: int = 0,
+    page_size: int = 25,
+) -> tuple[discord.Embed, list[discord.File]]:
+    cards = game.hand_for(user_id)
+    playable = set(game.playable_cards_for(user_id))
+    buffer, filename = render_hand_image(cards, playable, page, page_size, "your_hand.jpg")
+    file = discord.File(buffer, filename=filename)
+    embed = discord.Embed(title="Kartu Tangan")
+    embed.set_image(url=f"attachment://{filename}")
+    return embed, [file]
 
 
 async def reply_error(interaction: discord.Interaction, error: Exception) -> None:
@@ -148,18 +170,20 @@ async def refresh_table_message(session: UnoSession) -> None:
     if not hasattr(channel, "fetch_message"):
         return
     message = await channel.fetch_message(session.table_message_id)
-    await message.edit(content=table_text(session), view=table_view(session))
+    embed, files = table_visuals(session)
+    await message.edit(content=table_text(session), view=table_view(session), embed=embed, attachments=files)
 
 
 async def edit_table_from_interaction(interaction: discord.Interaction, session: UnoSession) -> None:
     content = table_text(session)
     view = table_view(session)
+    embed, files = table_visuals(session)
 
     if interaction.message and interaction.message.id == session.table_message_id:
         if interaction.response.is_done():
-            await interaction.message.edit(content=content, view=view)
+            await interaction.message.edit(content=content, view=view, embed=embed, attachments=files)
         else:
-            await interaction.response.edit_message(content=content, view=view)
+            await interaction.response.edit_message(content=content, view=view, embed=embed, attachments=files)
         return
 
     await refresh_table_message(session)
@@ -264,8 +288,11 @@ class GameView(discord.ui.View):
         try:
             session = get_session(self.channel_id)
             session.game.hand_for(interaction.user.id)
+            embed, files = hand_visuals(session.game, interaction.user.id)
             await interaction.response.send_message(
                 hand_text(session.game, interaction.user.id),
+                embed=embed,
+                files=files,
                 view=HandView(self.channel_id, interaction.user.id),
                 ephemeral=True,
             )
@@ -360,6 +387,8 @@ class CardSelect(discord.ui.Select):
             if card.is_wild:
                 await interaction.response.edit_message(
                     content=f"Kamu memilih **{card.label}**. Pilih warna baru:",
+                    embed=None,
+                    attachments=[],
                     view=ColorPickView(self.channel_id, self.user_id, card_number),
                 )
                 return
@@ -367,7 +396,12 @@ class CardSelect(discord.ui.Select):
             result = session.game.play_card(self.user_id, card_number)
             add_result_log(session, result.public_messages)
             await refresh_table_message(session)
-            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
+            await interaction.response.edit_message(
+                content="\n".join(result.public_messages),
+                embed=None,
+                attachments=[],
+                view=None,
+            )
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -397,8 +431,11 @@ class HandView(discord.ui.View):
                 raise UnoGameError("Ini panel kartu pemain lain.")
             session = get_session(self.channel_id)
             page = max(0, self.page - 1)
+            embed, files = hand_visuals(session.game, self.user_id, page, self.page_size)
             await interaction.response.edit_message(
                 content=hand_text(session.game, self.user_id, page, self.page_size),
+                embed=embed,
+                attachments=files,
                 view=HandView(self.channel_id, self.user_id, page),
             )
         except UnoGameError as error:
@@ -410,8 +447,11 @@ class HandView(discord.ui.View):
             if interaction.user.id != self.user_id:
                 raise UnoGameError("Ini panel kartu pemain lain.")
             session = get_session(self.channel_id)
+            embed, files = hand_visuals(session.game, self.user_id, self.page, self.page_size)
             await interaction.response.edit_message(
                 content=hand_text(session.game, self.user_id, self.page, self.page_size),
+                embed=embed,
+                attachments=files,
                 view=HandView(self.channel_id, self.user_id, self.page),
             )
         except UnoGameError as error:
@@ -426,8 +466,11 @@ class HandView(discord.ui.View):
             total_cards = len(session.game.hand_for(self.user_id))
             max_page = max(0, (total_cards - 1) // self.page_size)
             page = min(max_page, self.page + 1)
+            embed, files = hand_visuals(session.game, self.user_id, page, self.page_size)
             await interaction.response.edit_message(
                 content=hand_text(session.game, self.user_id, page, self.page_size),
+                embed=embed,
+                attachments=files,
                 view=HandView(self.channel_id, self.user_id, page),
             )
         except UnoGameError as error:
@@ -457,7 +500,12 @@ class ColorPickView(discord.ui.View):
             result = session.game.play_card(self.user_id, self.card_number, color)
             add_result_log(session, result.public_messages)
             await refresh_table_message(session)
-            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
+            await interaction.response.edit_message(
+                content="\n".join(result.public_messages),
+                embed=None,
+                attachments=[],
+                view=None,
+            )
         except UnoGameError as error:
             await reply_error(interaction, error)
 
@@ -511,7 +559,13 @@ async def uno_start(interaction: discord.Interaction) -> None:
         session.add_log(f"Lobby dibuat oleh {interaction.user.display_name}.")
         sessions_by_channel[channel_id] = session
 
-        await interaction.response.send_message(table_text(session), view=table_view(session))
+        embed, files = table_visuals(session)
+        await interaction.response.send_message(
+            table_text(session),
+            embed=embed,
+            files=files,
+            view=table_view(session),
+        )
         message = await interaction.original_response()
         session.table_message_id = message.id
     except UnoGameError as error:
@@ -522,8 +576,11 @@ async def uno_start(interaction: discord.Interaction) -> None:
 async def uno_hand(interaction: discord.Interaction) -> None:
     try:
         session = get_session(interaction.channel_id)
+        embed, files = hand_visuals(session.game, interaction.user.id)
         await interaction.response.send_message(
             hand_text(session.game, interaction.user.id),
+            embed=embed,
+            files=files,
             view=HandView(session.channel_id, interaction.user.id),
             ephemeral=True,
         )
