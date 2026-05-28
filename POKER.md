@@ -1,0 +1,9 @@
+Oke sementara sudah oke untuk bot UNO ini. Selanjutnya saya ingin membuat sebuah permainan kartu lagi, namun kali ini akan menggunakan kartu remi bukan UNO. akan terdapat command baru seperti "/poker-start" maka akan memainkan mode kartu remi poker. Untuk asset kamu bisa menggunakan pada folder playing-cards. Untuk rules nya akan saya jelaskan dibawah, kamu bisa mencari referensi lain jika perintah yang saya berikan tidak lengkap atau kurang. 
+1. Pemain dari mode ini adalah 2-4 orang saja.
+2. Semua kartu (kecuali joker) akan dibagikan secara merata kepada semua pemain yang terlibat. Jika pemain hanya 3 orang maka 1 kartu yang terisa adalah kartu milik pemain yang memiliki giliran pertama
+3. Giliran pertama dilihat dari pemain yang memiliki kartu "3 spade", namun jika terdapat pemain yang memiliki kartu angka "3" sebanyak 3 selain "3 spade" maka 3 kartu tersebut akan menjadi pemain dengan giliran pertama.
+4. Kombinasi yang dapat dilakukan pada permainan ini ada single (satu karty), double/pair(2 kartu dengan nilai yang sama), three of kind(3 kartu dengan nilai yang sama), straight(5 kartu berurutan dengan Ace sebagai ujung), flush(5 kartu dengan warna dan jenis yang sama termasuk poker card bisa digunakan disini), fullhouse (sebuah pair + three of kind yang mana three of kind yang menentukan tinggi tidaknya susunan kartu), four of kind, straight flush dan royal flush
+5. Kartu angka "2" merupakan poker
+6. Urutan kartu dari terkecil ke terbesar dalam 1 angka adalah diamonds - clubs - hearts - spade
+
+Sisanya kamu bisa cari refferensi dari web atau sumber lain dan buatkan plan dalam file md terlebih dahulu sebelum eksekusi

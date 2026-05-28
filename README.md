@@ -1,8 +1,15 @@
-# Discord Card Bot: UNO Reguler
+# Discord Card Bot: UNO Reguler dan Remi Poker
 
-Contoh implementasi custom bot Discord untuk memainkan UNO sederhana bersama anggota server.
+Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Saat ini bot hanya mendukung mode UNO reguler:
+Mode yang tersedia:
+
+- UNO reguler dengan tombol dan asset kartu.
+- Remi Poker / Big Two style dengan kartu remi.
+
+## Mode UNO Reguler
+
+Bot mendukung:
 
 - 4 warna: merah, kuning, hijau, biru
 - kartu angka 0-9
@@ -175,3 +182,53 @@ Fitur berikutnya yang paling masuk akal:
 - lobby owner/admin permission untuk `/uno_begin` dan `/uno_end`
 - timer auto-pass jika pemain terlalu lama
 - mode plugin agar game lain selain UNO bisa dipasang ke bot yang sama
+
+## Mode Remi Poker
+
+Slash command:
+
+```text
+/poker-start
+```
+
+Mode ini memakai kartu remi SVG dari:
+
+```text
+assets/playing-cards/svg-cards
+```
+
+Renderer akan mencoba meraster SVG menjadi gambar grid sebelum dikirim ke Discord. Jika native Cairo belum tersedia di Windows, bot otomatis fallback ke PNG dari `assets/playing-cards/png` agar game tetap berjalan.
+
+Rules utama:
+
+- Pemain 2-4 orang.
+- Joker tidak dipakai.
+- Kartu `3` hanya menentukan first turn lalu dibuang.
+- First turn diprioritaskan ke pemain yang punya `3 diamonds + 3 clubs + 3 hearts`; jika tidak ada, pemilik `3 spades`.
+- Rank playable dari kecil ke besar: `4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2`.
+- Suit dari kecil ke besar: diamonds, clubs, hearts, spades.
+- Straight tidak boleh memakai `2`; `A-2-3-4-5` tidak valid.
+- Pola ronde mengikuti pembuka ronde sampai table clear.
+- Kombinasi 5 kartu dari kecil ke besar: straight, flush, full house, four of a kind, straight flush, royal flush.
+- Four of a kind adalah 4 kartu rank sama dan bisa mengalahkan full house.
+- Four of a kind, straight flush, dan royal flush dianggap bombcard pada ladder kombinasi besar.
+- Game bisa memiliki 1-3 winner; loser adalah pemain terakhir yang masih punya kartu atau pemain yang terkena bombcard.
+- Jika ada pemain mendapat empat kartu `2`, game otomatis redeal.
+
+Panel Remi Poker memakai tombol:
+
+- **Ikut Main** untuk masuk lobby.
+- Dropdown **Pilih timer auto-pass** untuk memilih 30, 45, atau 60 detik sebelum game mulai.
+- **Mulai Game** untuk deal dan mulai.
+- **Lihat / Mainkan Kartu** untuk melihat kartu private dan memilih 1-5 kartu.
+- **Pass** untuk melewati giliran.
+- **Refresh Meja** untuk mengirim ulang panel terbaru.
+- **Vote End Game** untuk mengakhiri game jika mayoritas setuju.
+
+Jika pemain tidak beraksi sampai timer habis, bot akan menjalankan auto-pass. Jika pemain sedang membuka ronde baru dan belum ada kartu di meja, giliran pembuka akan dilewati ke pemain aktif berikutnya agar game tidak macet.
+
+Dokumen plan lengkap ada di:
+
+```text
+docs/POKER_MODE_PLAN.md
+```
