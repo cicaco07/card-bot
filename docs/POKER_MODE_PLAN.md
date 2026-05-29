@@ -68,9 +68,14 @@ Fitur MVP:
 Tidak masuk MVP:
 
 - Taruhan/chip.
-- Scoring multi-round.
 - Bot AI.
 - Persist game setelah bot restart.
+
+Tambahan setelah MVP:
+
+- Mode tournament memakai rules regular yang sama, tetapi bermain 3-20 ronde.
+- Skor tournament per ronde: pemenang pertama +20, pemenang berikutnya +10, posisi tengah +0, loser terakhir -10.
+- Setelah ronde selesai, meja menampilkan scoreboard dan tombol `Mulai Ronde Berikutnya`.
 
 ## Struktur File
 
@@ -238,6 +243,8 @@ Catatan:
 - `four_of_a_kind + kicker` adalah 4 kartu rank sama + 1 kartu random dan bisa dipakai sebagai bomb untuk mengalahkan single kartu `2`.
 - `royal_flush` adalah `10-J-Q-K-A` satu suit.
 - `four_of_a_kind`, `straight_flush`, dan `royal_flush` adalah bombcard.
+- Bombcard bisa menantang single kartu `2` hanya jika pemain yang mengeluarkan `2` masih punya sisa kartu.
+- Bombcard tidak bisa memotong pair `2` atau three of a kind `2`.
 
 ## Aturan Straight
 
@@ -320,20 +327,16 @@ User rule:
 - Pemain yang kalah adalah pemain yang tersisa terakhir dengan kartu tidak habis atau terkena bombcard.
 - Karena itu, bisa terdapat 1-3 pemenang.
 
-Interpretasi MVP yang disarankan:
+Implementasi final saat ini:
 
 - Bombcard `four_of_a_kind` dimainkan dengan 4 kartu rank sama, tetapi tetap masuk ladder kombinasi besar dan bisa mengalahkan full house.
 - Bombcard `straight_flush` dan `royal_flush` dimainkan dengan 5 kartu.
-- Jika bombcard berhasil dimainkan untuk mengalahkan kombinasi pemain sebelumnya, pemain pemilik kombinasi sebelumnya menjadi loser.
-- Game langsung selesai.
-- Semua pemain lain yang belum kalah menjadi winner.
-
-Open question sebelum implementasi bombcard final:
-
-- Apakah bombcard boleh memotong pola single/pair/three seperti "bomb" di beberapa game climbing?
-- Jika bombcard dimainkan sebagai pembuka ronde, apakah ada target yang terkena atau hanya menjadi kombinasi biasa?
-
-Rekomendasi MVP: bombcard tidak memotong single/pair/three dulu, agar engine konsisten dan mudah diuji.
+- Bombcard bisa memotong single `2` jika pemilik single `2` masih punya kartu di tangan.
+- Bombcard tidak bisa memotong pair `2` atau three of a kind `2`.
+- Bombcard memulai fase adu bomb. Pemain lain boleh pass atau memainkan bombcard yang lebih besar.
+- Jika bombcard dibalas bombcard lebih besar, target kalah berpindah ke pemain yang mengeluarkan bomb sebelumnya.
+- Ketika semua pemain lain pass, target bomb terakhir menjadi loser dan game langsung selesai.
+- Dalam tournament, ronde yang selesai karena bomb memberi +4 point ke bomber final, -4 point ke korban final, dan 0 point ke pemain lain.
 
 ## Flow Game
 
@@ -394,6 +397,14 @@ Minimal:
 ```text
 /poker-start
 ```
+
+Mode tournament:
+
+```text
+/poker-start mode:tournament rounds:3
+```
+
+`rounds` menerima angka 3 sampai 20. Di lobby tournament, jumlah ronde juga bisa diubah lewat dropdown sebelum game dimulai.
 
 Fallback opsional:
 
@@ -464,9 +475,12 @@ Unit/smoke test engine:
 Manual Discord test:
 
 - `/poker-start` menampilkan lobby.
+- `/poker-start mode:tournament rounds:3` menampilkan lobby tournament dan scoreboard kosong.
 - 2, 3, 4 pemain bisa join dan start.
 - Hand image private muncul.
 - Multi-select kartu bisa memainkan kombinasi.
+- Setelah `Mainkan Pilihan`, panel private tidak merender ulang hand otomatis.
+- Tournament memberi point saat ronde selesai dan bisa lanjut ke ronde berikutnya.
 - Panel publik repost ke bawah.
 - Timer auto-pass berjalan setelah game dimulai dan berpindah setiap giliran.
 - Vote end game bekerja.

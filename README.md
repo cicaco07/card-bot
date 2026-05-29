@@ -191,6 +191,14 @@ Slash command:
 /poker-start
 ```
 
+Untuk tournament:
+
+```text
+/poker-start mode:tournament rounds:3
+```
+
+`rounds` bisa diisi dari 3 sampai 20. Jika tidak memilih mode, bot memakai mode regular seperti sebelumnya.
+
 Mode ini memakai kartu remi SVG dari:
 
 ```text
@@ -202,6 +210,9 @@ Renderer akan mencoba meraster SVG menjadi gambar grid sebelum dikirim ke Discor
 Rules utama:
 
 - Pemain 2-4 orang.
+- Mode regular bermain 1 game.
+- Mode tournament bermain 3-20 game dengan skor akumulasi.
+- Skor tournament per ronde: winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10.
 - Joker tidak dipakai.
 - Kartu `3` hanya menentukan first turn lalu dibuang.
 - First turn diprioritaskan ke pemain yang punya `3 diamonds + 3 clubs + 3 hearts`; jika tidak ada, pemilik `3 spades`.
@@ -213,7 +224,10 @@ Rules utama:
 - Kombinasi 5 kartu dari kecil ke besar: straight, flush, full house, four of a kind, straight flush, royal flush.
 - Four of a kind adalah 4 kartu rank sama dan bisa mengalahkan full house.
 - Four of a kind, straight flush, dan royal flush dianggap bombcard pada ladder kombinasi besar.
-- Four of a kind + 1 kartu random bisa dipakai sebagai bomb untuk mengalahkan single kartu `2`.
+- Bombcard bisa dipakai untuk menantang single kartu `2` jika pemain yang mengeluarkan `2` masih punya sisa kartu.
+- Bombcard tidak bisa memotong pair `2` atau three of a kind `2`.
+- Saat adu bomb, pemain lain bisa membalas dengan bombcard yang lebih besar. Jika bomb yang lebih besar keluar, target kalah berpindah ke pemain yang mengeluarkan bomb sebelumnya.
+- Jika ronde tournament selesai karena bombcard, bomber mendapat +4 point, korban bomb mendapat -4 point, dan pemain lain mendapat 0 point untuk ronde tersebut.
 - Game bisa memiliki 1-3 winner; loser adalah pemain terakhir yang masih punya kartu atau pemain yang terkena bombcard.
 - Jika ada pemain mendapat empat kartu `2`, game otomatis redeal.
 
@@ -226,8 +240,11 @@ Panel Remi Poker memakai tombol:
 - **Pass** untuk melewati giliran.
 - **Refresh Meja** untuk mengirim ulang panel terbaru.
 - **Vote End Game** untuk mengakhiri game jika mayoritas setuju.
+- Pada mode tournament, setelah satu ronde selesai akan muncul tombol **Mulai Ronde Berikutnya** sampai jumlah ronde terpenuhi.
 
 Jika pemain tidak beraksi sampai timer habis, bot akan menjalankan auto-pass. Jika pemain sedang membuka ronde baru dan belum ada kartu di meja, giliran pembuka akan dilewati ke pemain aktif berikutnya agar game tidak macet.
+
+Setelah pemain menekan **Mainkan Pilihan**, panel private kartu tidak lagi dirender ulang otomatis. Ini sengaja dibuat agar Discord tidak menumpuk pesan ephemeral yang harus sering di-dismiss. Untuk melihat sisa kartu, tekan lagi tombol **Lihat / Mainkan Kartu** di panel meja.
 
 Dokumen plan lengkap ada di:
 

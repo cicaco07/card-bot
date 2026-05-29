@@ -32,6 +32,18 @@ COLOR_CHOICES = [
     app_commands.Choice(name="Biru", value="blue"),
 ]
 
+POKER_MODE_CHOICES = [
+    app_commands.Choice(name="Regular", value="regular"),
+    app_commands.Choice(name="Tournament", value="tournament"),
+]
+
+POKER_TOURNAMENT_POINTS = {
+    "first": 20,
+    "second": 10,
+    "middle": 0,
+    "loser": -10,
+}
+
 
 @dataclass
 class UnoSession:
@@ -70,6 +82,13 @@ class UnoSession:
 class PokerSession:
     channel_id: int
     owner_id: int
+    mode: str = "regular"
+    tournament_total_rounds: int = 3
+    tournament_current_round: int = 0
+    tournament_scores: dict[int, int] = field(default_factory=dict)
+    tournament_round_summaries: list[str] = field(default_factory=list)
+    tournament_scored_rounds: set[int] = field(default_factory=set)
+    tournament_aborted: bool = False
     game: PokerGame = field(default_factory=PokerGame)
     table_message_id: int | None = None
     log: list[str] = field(default_factory=list)
@@ -99,6 +118,85 @@ class PokerSession:
         votes = self.end_vote_count
         required = self.end_vote_required
         return votes, required, votes >= required
+
+    @property
+    def is_tournament(self) -> bool:
+        return self.mode == "tournament"
+
+    @property
+    def tournament_finished(self) -> bool:
+        return self.is_tournament and len(self.tournament_scored_rounds) >= self.tournament_total_rounds
+
+    @property
+    def tournament_between_rounds(self) -> bool:
+        return (
+            self.is_tournament
+            and self.game.status == PokerStatus.FINISHED
+            and not self.tournament_finished
+            and not self.tournament_aborted
+        )
+
+    def start_poker_round(self) -> list[str]:
+        if not self.is_tournament:
+            return self.game.start()
+
+        self.tournament_current_round += 1
+        self.end_game_votes.clear()
+        if not self.tournament_scores:
+            self.tournament_scores = {player.user_id: 0 for player in self.game.players}
+        messages = self.game.start()
+        return [f"Ronde tournament {self.tournament_current_round}/{self.tournament_total_rounds} dimulai."] + messages
+
+    def start_next_tournament_round(self) -> list[str]:
+        if not self.tournament_between_rounds:
+            raise PokerGameError("Tournament belum siap masuk ronde berikutnya.")
+
+        previous_players = [(player.user_id, player.name) for player in self.game.players]
+        self.game = PokerGame()
+        for user_id, name in previous_players:
+            self.game.add_player(user_id, name)
+        return self.start_poker_round()
+
+    def score_finished_tournament_round(self) -> list[str]:
+        if (
+            not self.is_tournament
+            or self.tournament_aborted
+            or self.game.status != PokerStatus.FINISHED
+            or self.tournament_current_round in self.tournament_scored_rounds
+        ):
+            return []
+
+        ranking = list(self.game.winner_ids)
+        if self.game.loser_id is not None and self.game.loser_id not in ranking:
+            ranking.append(self.game.loser_id)
+        ranking.extend(player.user_id for player in self.game.players if player.user_id not in ranking)
+
+        round_points: list[tuple[int, int]] = []
+        bomb_bomber_id = self.game.bomb_finish_bomber_id
+        bomb_loser_id = self.game.bomb_finish_loser_id
+        for place, user_id in enumerate(ranking):
+            if bomb_bomber_id is not None and bomb_loser_id is not None:
+                if user_id == bomb_bomber_id:
+                    points = 4
+                elif user_id == bomb_loser_id:
+                    points = -4
+                else:
+                    points = 0
+            elif user_id == self.game.loser_id:
+                points = POKER_TOURNAMENT_POINTS["loser"]
+            elif place == 0:
+                points = POKER_TOURNAMENT_POINTS["first"]
+            elif place == 1:
+                points = POKER_TOURNAMENT_POINTS["second"]
+            else:
+                points = POKER_TOURNAMENT_POINTS["middle"]
+            self.tournament_scores[user_id] = self.tournament_scores.get(user_id, 0) + points
+            round_points.append((user_id, points))
+
+        self.tournament_scored_rounds.add(self.tournament_current_round)
+        summary = format_tournament_round_summary(self.tournament_current_round, round_points)
+        self.tournament_round_summaries.append(summary)
+        return [summary]
 
 
 def require_channel_id(interaction: discord.Interaction) -> int:
@@ -137,6 +235,32 @@ def require_poker_player(session: PokerSession, user_id: int) -> None:
 
 def mention(user_id: int) -> str:
     return f"<@{user_id}>"
+
+
+def format_tournament_round_summary(round_number: int, round_points: list[tuple[int, int]]) -> str:
+    points_text = ", ".join(f"{mention(user_id)} {points:+d}" for user_id, points in round_points)
+    return f"Skor ronde {round_number}: {points_text}."
+
+
+def tournament_scoreboard_text(session: PokerSession) -> str:
+    if not session.is_tournament:
+        return ""
+    if not session.tournament_scores:
+        return "Skor tournament: belum ada ronde selesai."
+
+    sorted_scores = sorted(
+        session.tournament_scores.items(),
+        key=lambda item: (item[1], -item[0]),
+        reverse=True,
+    )
+    rows = [f"- {mention(user_id)}: **{score} point**" for user_id, score in sorted_scores]
+    return "Skor tournament:\n" + "\n".join(rows)
+
+
+def finalize_poker_round_if_needed(session: PokerSession) -> None:
+    score_messages = session.score_finished_tournament_round()
+    if score_messages:
+        session.log = (score_messages + session.log)[:3]
 
 
 def lobby_text(session: UnoSession) -> str:
@@ -312,10 +436,16 @@ def poker_lobby_text(session: PokerSession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players)
     if not players:
         players = "Belum ada pemain."
+    mode_text = "Tournament" if session.is_tournament else "Regular"
+    tournament_text = ""
+    if session.is_tournament:
+        tournament_text = f"Jumlah ronde tournament: **{session.tournament_total_rounds} game**\n"
     return (
         "**Remi Poker: Lobby**\n"
         "Mode ini memakai rules Big Two style: habiskan kartu, jangan menjadi loser.\n\n"
         f"Owner: {mention(session.owner_id)}\n"
+        f"Mode: **{mode_text}**\n"
+        f"{tournament_text}"
         f"Timer auto-pass: **{session.timer_seconds} detik**\n"
         f"Pemain ({len(session.game.players)}/{session.game.max_players}):\n{players}"
     )
@@ -336,20 +466,38 @@ def poker_state_text(session: PokerSession) -> str:
     current_player = mention(state["current_player_id"]) if state["current_player_id"] else "-"
     last_player = mention(state["last_play_player_id"]) if state["last_play_player_id"] else "-"
     last_play_suffix = " (ronde sebelumnya, table sudah clear)" if state["table_cleared"] else ""
+    bomb_duel_text = ""
+    if state["bomb_duel_active"]:
+        victim = mention(state["bomb_duel_current_victim_id"]) if state["bomb_duel_current_victim_id"] else "-"
+        bomber = mention(state["bomb_duel_current_bomber_id"]) if state["bomb_duel_current_bomber_id"] else "-"
+        original = mention(state["bomb_duel_original_target_id"]) if state["bomb_duel_original_target_id"] else "-"
+        bomb_duel_text = (
+            "\n"
+            f"Adu bomb aktif: bomb terakhir dari {bomber}. Target saat ini: {victim}. "
+            f"Target awal: {original}.\n"
+        )
+    tournament_header = ""
+    tournament_scores = ""
+    if session.is_tournament:
+        tournament_header = f"Mode: **Tournament ronde {session.tournament_current_round}/{session.tournament_total_rounds}**\n"
+        tournament_scores = f"\n\n{tournament_scoreboard_text(session)}"
 
     return (
         "**Remi Poker: Game Berjalan**\n"
+        f"{tournament_header}"
         f"Gilirannya: {current_player}\n"
         f"Timer auto-pass: **{session.timer_seconds} detik**\n"
         f"Pola ronde: **{state['round_pattern']}**\n"
         f"Kombinasi terakhir: **{state['last_play']}**{last_play_suffix}\n"
         f"Dimainkan oleh: {last_player}\n"
+        f"{bomb_duel_text}"
         f"Pass ronde ini: {state['pass_count']}\n\n"
         f"Jumlah kartu pemain:\n{hand_counts}\n\n"
         f"Winner sementara: {winners}\n"
         f"Loser: {loser}\n"
         f"Vote akhiri game: **{vote_text}**\n\n"
         f"Aksi terakhir:\n{action_text}"
+        f"{tournament_scores}"
     )
 
 
@@ -358,6 +506,35 @@ def poker_finished_text(session: PokerSession) -> str:
     winners = ", ".join(mention(user_id) for user_id in state["winner_ids"]) or "Tidak ada"
     loser = mention(state["loser_id"]) if state["loser_id"] else "Tidak ada"
     log_text = "\n".join(f"- {message}" for message in session.log[-3:]) or "- Game selesai."
+    if session.is_tournament:
+        if session.tournament_aborted:
+            return (
+                "**Remi Poker Tournament: Dihentikan**\n"
+                f"Ronde terakhir: {session.tournament_current_round}/{session.tournament_total_rounds}\n\n"
+                f"{tournament_scoreboard_text(session)}\n\n"
+                f"Log akhir:\n{log_text}\n\n"
+                "Tekan **Buat Lobby Baru** untuk main lagi."
+            )
+        if not session.tournament_finished:
+            return (
+                "**Remi Poker Tournament: Ronde Selesai**\n"
+                f"Ronde selesai: {session.tournament_current_round}/{session.tournament_total_rounds}\n"
+                f"Winner ronde: {winners}\n"
+                f"Loser ronde: {loser}\n\n"
+                f"{tournament_scoreboard_text(session)}\n\n"
+                f"Log akhir:\n{log_text}\n\n"
+                "Tekan **Mulai Ronde Berikutnya** untuk lanjut."
+            )
+        champion = next(iter(sorted(session.tournament_scores.items(), key=lambda item: item[1], reverse=True)), None)
+        champion_text = mention(champion[0]) if champion else "Tidak ada"
+        return (
+            "**Remi Poker Tournament: Selesai**\n"
+            f"Total ronde: {session.tournament_total_rounds}\n"
+            f"Champion: {champion_text}\n\n"
+            f"{tournament_scoreboard_text(session)}\n\n"
+            f"Log akhir:\n{log_text}\n\n"
+            "Tekan **Buat Lobby Baru** untuk main lagi."
+        )
     return (
         "**Remi Poker: Selesai**\n"
         f"Winner: {winners}\n"
@@ -393,6 +570,14 @@ def poker_rules_embed() -> discord.Embed:
         inline=False,
     )
     embed.add_field(
+        name="Mode Tournament",
+        value=(
+            "Regular bermain 1 game. Tournament bermain 3-20 ronde dengan akumulasi point: "
+            "winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10."
+        ),
+        inline=False,
+    )
+    embed.add_field(
         name="First Turn",
         value=(
             "Pemilik 3 diamonds + 3 clubs + 3 hearts mulai dulu. Jika tidak ada, pemilik 3 spades mulai."
@@ -418,8 +603,9 @@ def poker_rules_embed() -> discord.Embed:
     embed.add_field(
         name="Bombcard",
         value=(
-            "Four of a kind, straight flush, dan royal flush adalah bombcard. Untuk MVP, bombcard hanya berlaku "
-            "pada pola 5 kartu."
+            "Four of a kind, straight flush, dan royal flush adalah bombcard. Bomb bisa menantang single 2 "
+            "jika pemain yang mengeluarkan 2 masih punya sisa kartu. Bomb tidak bisa memotong pair/triple 2. "
+            "Jika bomb dibalas bomb lebih besar, target kalah berpindah ke pemain bomb sebelumnya."
         ),
         inline=False,
     )
@@ -429,6 +615,8 @@ def poker_rules_embed() -> discord.Embed:
 def poker_table_view(session: PokerSession) -> discord.ui.View:
     if session.game.status == PokerStatus.WAITING:
         return PokerLobbyView(session.channel_id)
+    if session.tournament_between_rounds:
+        return PokerTournamentRoundFinishedView(session.channel_id)
     if session.game.status == PokerStatus.FINISHED:
         return PokerFinishedView(session.channel_id)
     return PokerGameView(session.channel_id)
@@ -480,7 +668,8 @@ def poker_hand_visuals(
 
 
 async def reply_error(interaction: discord.Interaction, error: Exception) -> None:
-    message = f"UNO: {error}"
+    prefix = "Remi Poker" if isinstance(error, PokerGameError) else "UNO"
+    message = f"{prefix}: {error}"
     if interaction.response.is_done():
         await interaction.followup.send(message, ephemeral=True)
     else:
@@ -523,11 +712,13 @@ async def update_table_from_interaction(interaction: discord.Interaction, sessio
 
 
 async def refresh_poker_table_message(session: PokerSession) -> None:
+    finalize_poker_round_if_needed(session)
     await repost_poker_table_message(session)
     schedule_poker_turn_timer(session)
 
 
 async def repost_poker_table_message(session: PokerSession) -> None:
+    finalize_poker_round_if_needed(session)
     channel = bot.get_channel(session.channel_id)
     if not hasattr(channel, "send"):
         return
@@ -560,6 +751,7 @@ async def delete_poker_table_message(session: PokerSession, message_id: int) -> 
 async def update_poker_table_from_interaction(interaction: discord.Interaction, session: PokerSession) -> None:
     if not interaction.response.is_done():
         await interaction.response.defer()
+    finalize_poker_round_if_needed(session)
     await repost_poker_table_message(session)
     schedule_poker_turn_timer(session)
 
@@ -740,11 +932,96 @@ class PokerTimerSelect(discord.ui.Select):
             await reply_error(interaction, error)
 
 
+class PokerModeSelect(discord.ui.Select):
+    def __init__(self, channel_id: int) -> None:
+        self.channel_id = channel_id
+        session = get_poker_session(channel_id)
+        options = [
+            discord.SelectOption(
+                label="Regular",
+                value="regular",
+                description="Main 1 game seperti biasa",
+                default=not session.is_tournament,
+            ),
+            discord.SelectOption(
+                label="Tournament",
+                value="tournament",
+                description="Main 3-20 ronde dengan akumulasi point",
+                default=session.is_tournament,
+            ),
+        ]
+        super().__init__(
+            placeholder="Pilih mode permainan",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            require_poker_player(session, interaction.user.id)
+            if session.game.status != PokerStatus.WAITING:
+                raise PokerGameError("Mode hanya bisa diubah saat lobby belum mulai.")
+
+            session.mode = self.values[0]
+            if session.is_tournament:
+                session.tournament_total_rounds = max(3, session.tournament_total_rounds)
+                session.add_log("Mode diubah ke Tournament.")
+            else:
+                session.tournament_current_round = 0
+                session.tournament_scores.clear()
+                session.tournament_round_summaries.clear()
+                session.tournament_scored_rounds.clear()
+                session.tournament_aborted = False
+                session.add_log("Mode diubah ke Regular.")
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+
+class PokerTournamentRoundSelect(discord.ui.Select):
+    def __init__(self, channel_id: int) -> None:
+        self.channel_id = channel_id
+        options = [
+            discord.SelectOption(
+                label=f"{round_count} ronde",
+                value=str(round_count),
+                description="Jumlah game dalam tournament",
+            )
+            for round_count in range(3, 21)
+        ]
+        super().__init__(
+            placeholder="Pilih jumlah ronde tournament",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            require_poker_player(session, interaction.user.id)
+            if not session.is_tournament:
+                raise PokerGameError("Jumlah ronde hanya dipakai untuk mode tournament.")
+            if session.game.status != PokerStatus.WAITING:
+                raise PokerGameError("Jumlah ronde hanya bisa diubah saat lobby belum mulai.")
+            session.tournament_total_rounds = int(self.values[0])
+            session.add_log(f"Jumlah ronde tournament diatur ke {session.tournament_total_rounds}.")
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+
 class PokerLobbyView(discord.ui.View):
     def __init__(self, channel_id: int) -> None:
         super().__init__(timeout=None)
         self.channel_id = channel_id
+        session = poker_sessions_by_channel.get(channel_id)
+        self.add_item(PokerModeSelect(channel_id))
         self.add_item(PokerTimerSelect(channel_id))
+        if session and session.is_tournament:
+            self.add_item(PokerTournamentRoundSelect(channel_id))
 
     async def on_error(
         self,
@@ -768,7 +1045,7 @@ class PokerLobbyView(discord.ui.View):
     async def begin_game(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_poker_session(self.channel_id)
-            messages = session.game.start()
+            messages = session.start_poker_round()
             session.add_log(messages)
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
@@ -818,6 +1095,47 @@ class PokerFinishedView(discord.ui.View):
                 cancel_poker_turn_timer(old_session)
                 session.table_message_id = old_session.table_message_id
             poker_sessions_by_channel[self.channel_id] = session
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+
+class PokerTournamentRoundFinishedView(discord.ui.View):
+    def __init__(self, channel_id: int) -> None:
+        super().__init__(timeout=None)
+        self.channel_id = channel_id
+
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        _item: discord.ui.Item,
+    ) -> None:
+        await reply_error(interaction, error)
+
+    @discord.ui.button(label="Mulai Ronde Berikutnya", style=discord.ButtonStyle.success)
+    async def next_round(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            require_poker_player(session, interaction.user.id)
+            cancel_poker_turn_timer(session)
+            messages = session.start_next_tournament_round()
+            session.add_log(messages)
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Vote End Tournament", style=discord.ButtonStyle.danger)
+    async def vote_end_tournament(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            votes, required, approved = session.add_end_vote(interaction.user.id)
+            if approved:
+                session.tournament_aborted = True
+                session.end_game_votes.clear()
+                session.add_log(f"Vote end tournament disetujui {votes}/{required}. Tournament dihentikan.")
+            else:
+                session.add_log(f"{interaction.user.display_name} vote end tournament ({votes}/{required}).")
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
             await reply_error(interaction, error)
@@ -877,8 +1195,11 @@ class PokerGameView(discord.ui.View):
             votes, required, approved = session.add_end_vote(interaction.user.id)
             if approved:
                 session.game.status = PokerStatus.FINISHED
+                if session.is_tournament:
+                    session.tournament_aborted = True
                 session.end_game_votes.clear()
-                session.add_log(f"Vote end game disetujui {votes}/{required}. Game diakhiri.")
+                label = "Tournament" if session.is_tournament else "Game"
+                session.add_log(f"Vote end game disetujui {votes}/{required}. {label} diakhiri.")
             else:
                 session.add_log(f"{interaction.user.display_name} vote end game ({votes}/{required}).")
             await update_poker_table_from_interaction(interaction, session)
@@ -1232,20 +1553,16 @@ class PokerHandView(discord.ui.View):
             session = get_poker_session(self.channel_id)
             result = session.game.play_cards(self.user_id, sorted(self.selected_numbers))
             add_poker_result_log(session, result.public_messages)
-            total_cards = len(session.game.hand_for(self.user_id))
-            max_page = max(0, (total_cards - 1) // self.page_size)
-            page = min(self.page, max_page)
-            selected_numbers: set[int] = set()
-            embed, files = poker_hand_visuals(session.game, self.user_id, page, self.page_size, selected_numbers)
             action_text = "\n".join(result.public_messages)
             await interaction.response.edit_message(
                 content=(
                     f"{action_text}\n\n"
-                    f"{poker_hand_text(session.game, self.user_id, page, self.page_size, selected_numbers)}"
+                    "Panel kartu ini ditutup agar chat tidak penuh. Tekan **Lihat / Mainkan Kartu** lagi "
+                    "jika ingin melihat sisa kartu."
                 ),
-                embed=embed,
-                attachments=files,
-                view=PokerHandView(self.channel_id, self.user_id, page, selected_numbers),
+                embed=None,
+                attachments=[],
+                view=None,
             )
             await refresh_poker_table_message(session)
         except PokerGameError as error:
@@ -1499,16 +1816,31 @@ async def uno_play(
 
 
 @tree.command(name="poker-start", description="Tampilkan meja Remi Poker interaktif di channel ini.")
-async def poker_start(interaction: discord.Interaction) -> None:
+@app_commands.describe(
+    mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
+    rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+)
+@app_commands.choices(mode=POKER_MODE_CHOICES)
+async def poker_start(
+    interaction: discord.Interaction,
+    mode: str = "regular",
+    rounds: app_commands.Range[int, 3, 20] = 3,
+) -> None:
     try:
         channel_id = require_channel_id(interaction)
         existing = poker_sessions_by_channel.get(channel_id)
-        if existing and existing.game.status != PokerStatus.FINISHED:
+        if existing and (existing.game.status != PokerStatus.FINISHED or existing.tournament_between_rounds):
             raise PokerGameError("Sudah ada meja Remi Poker aktif di channel ini.")
 
-        session = PokerSession(channel_id=channel_id, owner_id=interaction.user.id)
+        session = PokerSession(
+            channel_id=channel_id,
+            owner_id=interaction.user.id,
+            mode=mode,
+            tournament_total_rounds=rounds,
+        )
         session.game.add_player(interaction.user.id, interaction.user.display_name)
-        session.add_log(f"Lobby dibuat oleh {interaction.user.display_name}.")
+        mode_label = "Tournament" if session.is_tournament else "Regular"
+        session.add_log(f"Lobby {mode_label} dibuat oleh {interaction.user.display_name}.")
         poker_sessions_by_channel[channel_id] = session
 
         embed, files = poker_table_visuals(session)
