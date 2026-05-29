@@ -1211,8 +1211,9 @@ class PokerGameView(discord.ui.View):
         try:
             session = get_poker_session(self.channel_id)
             session.game.hand_for(interaction.user.id)
-            embed, files = poker_hand_visuals(session.game, interaction.user.id)
-            await interaction.response.send_message(
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            embed, files = await asyncio.to_thread(poker_hand_visuals, session.game, interaction.user.id)
+            await interaction.followup.send(
                 poker_hand_text(session.game, interaction.user.id),
                 embed=embed,
                 files=files,
@@ -1546,14 +1547,16 @@ class PokerCardSelect(discord.ui.Select):
 
             session = get_poker_session(self.channel_id)
             selected_numbers = {int(value) for value in self.values}
-            embed, files = poker_hand_visuals(
+            await interaction.response.defer()
+            embed, files = await asyncio.to_thread(
+                poker_hand_visuals,
                 session.game,
                 self.user_id,
                 self.page,
                 self.page_size,
                 selected_numbers,
             )
-            await interaction.response.edit_message(
+            await interaction.edit_original_response(
                 content=poker_hand_text(
                     session.game,
                     self.user_id,
@@ -1646,8 +1649,16 @@ class PokerHandView(discord.ui.View):
                 raise PokerGameError("Ini panel kartu pemain lain.")
             session = get_poker_session(self.channel_id)
             selected_numbers: set[int] = set()
-            embed, files = poker_hand_visuals(session.game, self.user_id, page, self.page_size, selected_numbers)
-            await interaction.response.edit_message(
+            await interaction.response.defer()
+            embed, files = await asyncio.to_thread(
+                poker_hand_visuals,
+                session.game,
+                self.user_id,
+                page,
+                self.page_size,
+                selected_numbers,
+            )
+            await interaction.edit_original_response(
                 content=poker_hand_text(session.game, self.user_id, page, self.page_size, selected_numbers),
                 embed=embed,
                 attachments=files,
@@ -1929,8 +1940,10 @@ async def poker_start(
 async def poker_hand(interaction: discord.Interaction) -> None:
     try:
         session = get_poker_session(interaction.channel_id)
-        embed, files = poker_hand_visuals(session.game, interaction.user.id)
-        await interaction.response.send_message(
+        session.game.hand_for(interaction.user.id)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed, files = await asyncio.to_thread(poker_hand_visuals, session.game, interaction.user.id)
+        await interaction.followup.send(
             poker_hand_text(session.game, interaction.user.id),
             embed=embed,
             files=files,

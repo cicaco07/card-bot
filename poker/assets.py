@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 
@@ -86,6 +87,12 @@ def render_play_image(cards: list[PokerCard], filename: str = "poker_table.jpg")
 
 
 def _open_svg_card(card: PokerCard, width: int, height: int) -> Image.Image:
+    return _open_svg_card_cached(card.rank, card.suit, width, height).copy()
+
+
+@lru_cache(maxsize=256)
+def _open_svg_card_cached(rank: str, suit: str, width: int, height: int) -> Image.Image:
+    card = PokerCard(rank, suit)
     try:
         import cairosvg
         svg_path = card_asset_path(card)
