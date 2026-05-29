@@ -22,8 +22,39 @@ bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 sessions_by_channel: dict[int, "UnoSession"] = {}
 poker_sessions_by_channel: dict[int, "PokerSession"] = {}
+changelog_seen_versions_by_user: dict[int, str] = {}
 commands_synced = False
 
+
+APP_VERSION = "1.0.1"
+
+CHANGELOG_ENTRIES = [
+    {
+        "version": "1.0.1",
+        "title": "Poker Tournament dan penyempurnaan bombcard",
+        "date": "2026-05-29",
+        "changes": [
+            "Menambahkan mode Poker Tournament dengan pilihan 3-20 ronde.",
+            "Menambahkan scoreboard tournament dengan point winner pertama +20, winner berikutnya +10, posisi tengah +0, dan loser -10.",
+            "Menambahkan scoring khusus bombcard di tournament: bomber final +40, korban bomb -40, pemain lain 0.",
+            "Menambahkan fase adu bomb untuk single kartu 2 yang masih menyisakan kartu di tangan.",
+            "Menambahkan dropdown mode permainan di lobby poker: Regular atau Tournament.",
+            "Mengurangi pesan ephemeral poker hand yang menumpuk setelah pemain menekan Mainkan Pilihan.",
+            "Menambahkan dokumentasi deploy dan rules terbaru di README.",
+        ],
+    },
+    {
+        "version": "1.0.0",
+        "title": "Rilis awal CardBot",
+        "date": "2026-05-28",
+        "changes": [
+            "Menambahkan mode UNO reguler dengan tombol Discord, asset kartu, rules panel, tombol UNO, Challenge UNO, dan vote end game.",
+            "Menambahkan mode Remi Poker regular dengan asset kartu remi, lobby, timer auto-pass, play/pass, auto-skip pair/triple, bombcard, dan vote end game.",
+            "Menambahkan render kartu tangan private berbasis gambar untuk UNO dan Remi Poker.",
+            "Menambahkan panel meja yang otomatis repost ke pesan terbaru agar pemain tidak perlu scroll ke atas.",
+        ],
+    },
+]
 
 COLOR_CHOICES = [
     app_commands.Choice(name="Merah", value="red"),
@@ -177,9 +208,9 @@ class PokerSession:
         for place, user_id in enumerate(ranking):
             if bomb_bomber_id is not None and bomb_loser_id is not None:
                 if user_id == bomb_bomber_id:
-                    points = 4
+                    points = 40
                 elif user_id == bomb_loser_id:
-                    points = -4
+                    points = -40
                 else:
                     points = 0
             elif user_id == self.game.loser_id:
@@ -261,6 +292,26 @@ def finalize_poker_round_if_needed(session: PokerSession) -> None:
     score_messages = session.score_finished_tournament_round()
     if score_messages:
         session.log = (score_messages + session.log)[:3]
+
+
+def semver_tuple(version: str) -> tuple[int, int, int]:
+    major, feature, patch = version.split(".")
+    return int(major), int(feature), int(patch)
+
+
+def latest_changelog_entry() -> dict[str, object]:
+    return max(CHANGELOG_ENTRIES, key=lambda entry: semver_tuple(str(entry["version"])))
+
+
+def format_changelog_entry(entry: dict[str, object]) -> str:
+    changes = "\n".join(f"- {change}" for change in entry["changes"])
+    return (
+        f"**CardBot v{entry['version']} - {entry['title']}**\n"
+        f"Tanggal: {entry['date']}\n\n"
+        f"{changes}\n\n"
+        "Format versi: `major.feature.patch`, contoh `1.2.30` berarti major `1`, fitur baru `2`, "
+        "dan minor/bugfix `30`."
+    )
 
 
 def lobby_text(session: UnoSession) -> str:
@@ -573,7 +624,8 @@ def poker_rules_embed() -> discord.Embed:
         name="Mode Tournament",
         value=(
             "Regular bermain 1 game. Tournament bermain 3-20 ronde dengan akumulasi point: "
-            "winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10."
+            "winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10. "
+            "Jika ronde selesai karena bombcard, bomber final +40 dan korban bomb -40."
         ),
         inline=False,
     )
@@ -1769,6 +1821,23 @@ async def uno_start(interaction: discord.Interaction) -> None:
         session.table_message_id = message.id
     except UnoGameError as error:
         await reply_error(interaction, error)
+
+
+@tree.command(name="changelog", description="Cek changelog terbaru CardBot.")
+async def changelog(interaction: discord.Interaction) -> None:
+    latest = latest_changelog_entry()
+    latest_version = str(latest["version"])
+    seen_version = changelog_seen_versions_by_user.get(interaction.user.id)
+
+    if seen_version is not None and semver_tuple(seen_version) >= semver_tuple(latest_version):
+        await interaction.response.send_message(
+            f"Tidak ada changelog baru. Versi saat ini: **v{APP_VERSION}**.",
+            ephemeral=True,
+        )
+        return
+
+    changelog_seen_versions_by_user[interaction.user.id] = latest_version
+    await interaction.response.send_message(format_changelog_entry(latest), ephemeral=True)
 
 
 @tree.command(name="uno_hand", description="Fallback: lihat kartu tanganmu secara private.")

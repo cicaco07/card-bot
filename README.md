@@ -2,6 +2,16 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
+Versi saat ini: `1.0.1`
+
+Command changelog:
+
+```text
+/changelog
+```
+
+Command ini menampilkan changelog terbaru jika user tersebut belum melihat versi terbaru selama bot berjalan. Jika sudah pernah dilihat, bot hanya memberi info bahwa belum ada changelog baru.
+
 Mode yang tersedia:
 
 - UNO reguler dengan tombol dan asset kartu.
@@ -227,7 +237,7 @@ Rules utama:
 - Bombcard bisa dipakai untuk menantang single kartu `2` jika pemain yang mengeluarkan `2` masih punya sisa kartu.
 - Bombcard tidak bisa memotong pair `2` atau three of a kind `2`.
 - Saat adu bomb, pemain lain bisa membalas dengan bombcard yang lebih besar. Jika bomb yang lebih besar keluar, target kalah berpindah ke pemain yang mengeluarkan bomb sebelumnya.
-- Jika ronde tournament selesai karena bombcard, bomber mendapat +4 point, korban bomb mendapat -4 point, dan pemain lain mendapat 0 point untuk ronde tersebut.
+- Jika ronde tournament selesai karena bombcard, bomber mendapat +40 point, korban bomb mendapat -40 point, dan pemain lain mendapat 0 point untuk ronde tersebut.
 - Game bisa memiliki 1-3 winner; loser adalah pemain terakhir yang masih punya kartu atau pemain yang terkena bombcard.
 - Jika ada pemain mendapat empat kartu `2`, game otomatis redeal.
 

@@ -336,7 +336,7 @@ Implementasi final saat ini:
 - Bombcard memulai fase adu bomb. Pemain lain boleh pass atau memainkan bombcard yang lebih besar.
 - Jika bombcard dibalas bombcard lebih besar, target kalah berpindah ke pemain yang mengeluarkan bomb sebelumnya.
 - Ketika semua pemain lain pass, target bomb terakhir menjadi loser dan game langsung selesai.
-- Dalam tournament, ronde yang selesai karena bomb memberi +4 point ke bomber final, -4 point ke korban final, dan 0 point ke pemain lain.
+- Dalam tournament, ronde yang selesai karena bomb memberi +40 point ke bomber final, -40 point ke korban final, dan 0 point ke pemain lain.
 
 ## Flow Game
 
