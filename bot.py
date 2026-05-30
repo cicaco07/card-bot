@@ -131,7 +131,7 @@ class PokerSession:
     def add_log(self, messages: list[str] | str) -> None:
         if isinstance(messages, str):
             messages = [messages]
-        self.log = messages[-3:]
+        self.log = messages[-5:]
 
     @property
     def end_vote_required(self) -> int:
@@ -311,6 +311,17 @@ def format_changelog_entry(entry: dict[str, object]) -> str:
         f"{changes}\n\n"
         "Format versi: `major.feature.patch`, contoh `1.2.30` berarti major `1`, fitur baru `2`, "
         "dan minor/bugfix `30`."
+    )
+
+
+def format_public_changelog_entry(entry: dict[str, object], mention_everyone: bool) -> str:
+    mention_text = "@everyone\n\n" if mention_everyone else ""
+    changes = "\n".join(f"- {change}" for change in entry["changes"])
+    return (
+        f"{mention_text}"
+        f"## UPDATE v{entry['version']}\n\n"
+        f"- {entry['title']}\n"
+        f"{changes}"
     )
 
 
@@ -512,7 +523,7 @@ def poker_state_text(session: PokerSession) -> str:
     )
     winners = ", ".join(mention(user_id) for user_id in state["winner_ids"]) or "Belum ada"
     loser = mention(state["loser_id"]) if state["loser_id"] else "Belum ada"
-    action_text = "\n".join(f"- {message}" for message in session.log[:2]) or "- Belum ada aksi."
+    action_text = "\n".join(f"- {message}" for message in session.log[:4]) or "- Belum ada aksi."
     vote_text = f"{session.end_vote_count}/{session.end_vote_required} setuju"
     current_player = mention(state["current_player_id"]) if state["current_player_id"] else "-"
     last_player = mention(state["last_play_player_id"]) if state["last_play_player_id"] else "-"
@@ -1849,6 +1860,56 @@ async def changelog(interaction: discord.Interaction) -> None:
 
     changelog_seen_versions_by_user[interaction.user.id] = latest_version
     await interaction.response.send_message(format_changelog_entry(latest), ephemeral=True)
+
+
+@tree.command(name="publish-changelog", description="Kirim changelog terbaru ke channel sebagai bot.")
+@app_commands.default_permissions(manage_guild=True)
+@app_commands.describe(
+    channel="Channel tujuan. Kosongkan untuk memakai channel ini.",
+    mention_everyone="Aktifkan jika ingin ping @everyone.",
+)
+async def publish_changelog(
+    interaction: discord.Interaction,
+    channel: discord.TextChannel | None = None,
+    mention_everyone: bool = False,
+) -> None:
+    if interaction.guild is None:
+        await interaction.response.send_message("Command ini hanya bisa dipakai di server.", ephemeral=True)
+        return
+
+    user_permissions = getattr(interaction.user, "guild_permissions", None)
+    if user_permissions is None or not user_permissions.manage_guild:
+        await interaction.response.send_message(
+            "Kamu perlu permission **Manage Server** untuk publish changelog.",
+            ephemeral=True,
+        )
+        return
+
+    destination = channel or interaction.channel
+    if not isinstance(destination, discord.TextChannel):
+        await interaction.response.send_message(
+            "Pilih text/announcement channel sebagai tujuan changelog.",
+            ephemeral=True,
+        )
+        return
+
+    latest = latest_changelog_entry()
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    message = await destination.send(
+        format_public_changelog_entry(latest, mention_everyone),
+        allowed_mentions=discord.AllowedMentions(everyone=mention_everyone),
+    )
+
+    reaction_error = False
+    for emoji in ("🔥", "👍", "❤️"):
+        try:
+            await message.add_reaction(emoji)
+        except discord.HTTPException:
+            reaction_error = True
+            break
+
+    note = " Reaksi default gagal ditambahkan; cek permission **Add Reactions**." if reaction_error else ""
+    await interaction.followup.send(f"Changelog v{latest['version']} sudah dikirim ke {destination.mention}.{note}", ephemeral=True)
 
 
 @tree.command(name="uno_hand", description="Fallback: lihat kartu tanganmu secara private.")

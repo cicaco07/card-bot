@@ -200,12 +200,14 @@ Prioritas:
 
 1. Pemain yang memiliki `3 diamonds + 3 clubs + 3 hearts` menjadi first turn.
 2. Jika tidak ada, pemain yang memiliki `3 spades` menjadi first turn.
+3. Urutan pemain berikutnya disusun dari kartu `3` tertinggi: `3 hearts`, `3 clubs`, lalu `3 diamonds`.
 
 Keputusan final user:
 
 - Triple `3` non-spade benar-benar mengalahkan prioritas pemilik `3 spades`.
 - Setelah first turn ditentukan, semua kartu rank `3` langsung dibuang.
 - First player memulai round pertama dengan kombinasi bebas dari kartu `4` ke atas.
+- Saat game dimulai, panel log menampilkan kartu `3` yang dimiliki setiap pemain dan urutan awal sebelum kartu `3` dibuang.
 
 ## Kombinasi Valid
 

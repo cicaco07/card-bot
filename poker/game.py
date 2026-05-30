@@ -25,6 +25,12 @@ SUIT_LABELS = {
     "hearts": "Hearts",
     "spades": "Spades",
 }
+START_THREE_PRIORITY = {
+    "diamonds": 0,
+    "clubs": 1,
+    "hearts": 2,
+    "spades": 3,
+}
 RANK_LABELS = {
     "J": "Jack",
     "Q": "Queen",
@@ -162,6 +168,9 @@ class PokerGame:
         else:
             raise PokerGameError("Redeal terlalu sering karena 4 poker. Coba mulai ulang game.")
 
+        start_card_messages = self._start_card_messages()
+        self._reorder_players_by_start_cards()
+        self.turn_index = 0
         self._discard_rank_threes()
         for player in self.players:
             player.hand = self._sort_cards(player.hand)
@@ -171,6 +180,7 @@ class PokerGame:
         messages.extend(
             [
                 f"Game Remi Poker dimulai dengan {len(self.players)} pemain.",
+                *start_card_messages,
                 f"Semua kartu 3 dibuang. Rank terendah yang dimainkan adalah 4.",
                 f"Giliran pertama: {first_player.name}.",
             ]
@@ -627,14 +637,62 @@ class PokerGame:
                     player.hand.append(deck.pop())
 
     def _find_first_turn_index(self) -> int:
-        triple_three = {PokerCard("3", "diamonds"), PokerCard("3", "clubs"), PokerCard("3", "hearts")}
+        best_index: int | None = None
+        best_priority: tuple[int, int] | None = None
         for index, player in enumerate(self.players):
-            if triple_three.issubset(set(player.hand)):
-                return index
-        for index, player in enumerate(self.players):
-            if PokerCard("3", "spades") in player.hand:
-                return index
+            priority = self._start_card_priority(player)
+            if priority is None:
+                continue
+            if best_priority is None or priority > best_priority:
+                best_index = index
+                best_priority = priority
+        if best_index is not None:
+            return best_index
         raise PokerGameError("Tidak ada kartu 3 penentu giliran. Deck kemungkinan tidak valid.")
+
+    def _reorder_players_by_start_cards(self) -> None:
+        original_order = {player.user_id: index for index, player in enumerate(self.players)}
+        self.players.sort(
+            key=lambda player: (
+                self._start_card_priority(player) or (-1, -1),
+                -original_order[player.user_id],
+            ),
+            reverse=True,
+        )
+
+    def _start_card_messages(self) -> list[str]:
+        rows = []
+        for player in self.players:
+            threes = self._rank_three_cards(player)
+            labels = ", ".join(card.label for card in threes) if threes else "Tidak ada"
+            rows.append(f"{player.name}: {labels}")
+        order = sorted(
+            self.players,
+            key=lambda player: self._start_card_priority(player) or (-1, -1),
+            reverse=True,
+        )
+        return [
+            "Kartu 3 penentu giliran: " + " | ".join(rows) + ".",
+            "Urutan awal berdasarkan kartu 3: " + " -> ".join(player.name for player in order) + ".",
+        ]
+
+    @staticmethod
+    def _rank_three_cards(player: PokerPlayer) -> list[PokerCard]:
+        return sorted(
+            [card for card in player.hand if card.rank == "3"],
+            key=lambda card: card.suit_value,
+            reverse=True,
+        )
+
+    def _start_card_priority(self, player: PokerPlayer) -> tuple[int, int] | None:
+        threes = self._rank_three_cards(player)
+        if not threes:
+            return None
+        triple_three = {PokerCard("3", "diamonds"), PokerCard("3", "clubs"), PokerCard("3", "hearts")}
+        if triple_three.issubset(set(player.hand)):
+            return 4, len(threes)
+        highest_three = threes[0]
+        return START_THREE_PRIORITY[highest_three.suit], len(threes)
 
     def _has_four_twos(self) -> bool:
         all_twos = {PokerCard("2", suit) for suit in SUITS}

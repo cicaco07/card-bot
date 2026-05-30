@@ -8,9 +8,12 @@ Command changelog:
 
 ```text
 /changelog
+/publish-changelog
 ```
 
 Command ini menampilkan changelog terbaru jika user tersebut belum melihat versi terbaru selama bot berjalan. Jika sudah pernah dilihat, bot hanya memberi info bahwa belum ada changelog baru.
+
+`/publish-changelog` mengirim changelog terbaru ke channel sebagai pesan publik dari bot. Command ini hanya bisa dipakai user dengan permission **Manage Server**. Pilih `mention_everyone: True` jika ingin tampilan highlight seperti pesan yang melakukan ping `@everyone`.
 
 Mode yang tersedia:
 
@@ -55,6 +58,8 @@ Cara paling umum:
    - `View Channels`
    - `Send Messages`
    - `Read Message History`
+   - `Add Reactions`
+   - `Mention Everyone` jika `/publish-changelog mention_everyone: True` akan dipakai
 5. Salin URL yang muncul di bagian bawah.
 6. Buka URL tersebut di browser.
 7. Pilih server tujuan.
@@ -225,7 +230,8 @@ Rules utama:
 - Skor tournament per ronde: winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10.
 - Joker tidak dipakai.
 - Kartu `3` hanya menentukan first turn lalu dibuang.
-- First turn diprioritaskan ke pemain yang punya `3 diamonds + 3 clubs + 3 hearts`; jika tidak ada, pemilik `3 spades`.
+- Saat game dimulai, bot menampilkan kartu `3` yang dimiliki setiap pemain sebelum kartu tersebut dibuang.
+- Urutan awal ditentukan dari kartu `3`: prioritas khusus `3 diamonds + 3 clubs + 3 hearts`, lalu `3 spades`, `3 hearts`, `3 clubs`, dan `3 diamonds`.
 - Rank playable dari kecil ke besar: `4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2`.
 - Suit dari kecil ke besar: diamonds, clubs, hearts, spades.
 - Straight tidak boleh memakai `2`; `A-2-3-4-5` tidak valid.
