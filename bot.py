@@ -1895,21 +1895,68 @@ async def publish_changelog(
 
     latest = latest_changelog_entry()
     await interaction.response.defer(ephemeral=True, thinking=True)
-    message = await destination.send(
-        format_public_changelog_entry(latest, mention_everyone),
-        allowed_mentions=discord.AllowedMentions(everyone=mention_everyone),
-    )
+    bot_member = interaction.guild.me
+    if bot_member is None and bot.user is not None:
+        bot_member = interaction.guild.get_member(bot.user.id)
+    if bot_member is None:
+        await interaction.followup.send("Bot member tidak ditemukan di server ini.", ephemeral=True)
+        return
 
-    reaction_error = False
-    for emoji in ("🔥", "👍", "❤️"):
-        try:
-            await message.add_reaction(emoji)
-        except discord.HTTPException:
-            reaction_error = True
-            break
+    bot_permissions = destination.permissions_for(bot_member)
+    if not bot_permissions.send_messages:
+        await interaction.followup.send(
+            f"Bot belum punya permission **Send Messages** di {destination.mention}.",
+            ephemeral=True,
+        )
+        return
+    if mention_everyone and not bot_permissions.mention_everyone:
+        await interaction.followup.send(
+            f"Bot belum punya permission **Mention Everyone** di {destination.mention}.",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        message = await asyncio.wait_for(
+            destination.send(
+                format_public_changelog_entry(latest, mention_everyone),
+                allowed_mentions=discord.AllowedMentions(everyone=mention_everyone),
+            ),
+            timeout=15,
+        )
+    except TimeoutError:
+        await interaction.followup.send(
+            "Bot terlalu lama saat mencoba mengirim changelog. Coba lagi atau cek koneksi host bot.",
+            ephemeral=True,
+        )
+        return
+    except discord.Forbidden:
+        await interaction.followup.send(
+            f"Discord menolak pesan ke {destination.mention}. Cek permission bot di channel itu.",
+            ephemeral=True,
+        )
+        return
+    except discord.HTTPException as error:
+        await interaction.followup.send(
+            f"Gagal mengirim changelog: `{error}`",
+            ephemeral=True,
+        )
+        return
+
+    reaction_error = not bot_permissions.add_reactions
+    if not reaction_error:
+        for emoji in ("\U0001f525", "\U0001f44d", "\u2764\ufe0f"):
+            try:
+                await asyncio.wait_for(message.add_reaction(emoji), timeout=5)
+            except (TimeoutError, discord.HTTPException):
+                reaction_error = True
+                break
 
     note = " Reaksi default gagal ditambahkan; cek permission **Add Reactions**." if reaction_error else ""
-    await interaction.followup.send(f"Changelog v{latest['version']} sudah dikirim ke {destination.mention}.{note}", ephemeral=True)
+    await interaction.followup.send(
+        f"Changelog v{latest['version']} sudah dikirim ke {destination.mention}.{note}",
+        ephemeral=True,
+    )
 
 
 @tree.command(name="uno_hand", description="Fallback: lihat kartu tanganmu secara private.")
