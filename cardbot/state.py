@@ -7,11 +7,12 @@ from typing import TYPE_CHECKING
 import discord
 
 if TYPE_CHECKING:
-    from .sessions import PokerSession, UnoSession
+    from .sessions import PokerSession, RummySession, UnoSession
 
 
 sessions_by_channel: dict[int, "UnoSession"] = {}
 poker_sessions_by_channel: dict[int, "PokerSession"] = {}
+rummy_sessions_by_channel: dict[int, "RummySession"] = {}
 changelog_seen_versions_by_user: dict[int, str] = {}
 _client: discord.Client | None = None
 

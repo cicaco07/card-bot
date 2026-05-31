@@ -1,8 +1,8 @@
-# Discord Card Bot: UNO Reguler dan Remi Poker
+# Discord Card Bot: UNO Reguler, Remi Poker, dan Rummy
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.0.1`
+Versi saat ini: `1.1.0`
 
 Command changelog:
 
@@ -19,6 +19,7 @@ Mode yang tersedia:
 
 - UNO reguler dengan tombol dan asset kartu.
 - Remi Poker / Big Two style dengan kartu remi.
+- Rummy regular atau tournament dengan meld, joker, dan closed card.
 
 ## Mode UNO Reguler
 
@@ -266,4 +267,47 @@ Dokumen plan lengkap ada di:
 
 ```text
 docs/POKER_MODE_PLAN.md
+```
+
+## Mode Rummy
+
+Slash command:
+
+```text
+/rummy-start
+```
+
+Untuk tournament:
+
+```text
+/rummy-start mode:tournament rounds:3
+```
+
+Rules utama:
+
+- Pemain 2-4 orang dan mendapat 7 kartu.
+- Deck memakai 52 kartu standar dan 2 joker.
+- Setiap giliran ambil satu kartu dari deck atau buangan, lalu buang satu kartu.
+- Buangan dapat dipilih dari maksimal 7 kartu teratas jika langsung melengkapi meld dari minimal 2 kartu tangan.
+- Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
+- Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
+- Tombol **Closed Card** mengakhiri ronde jika seluruh kartu tersisa sudah menjadi meld.
+- Meld bernilai positif; kartu tersisa bernilai negatif.
+- Bonus closed card setelah draw deck: angka +50, J/Q/K +100, Ace +150, joker +250.
+- Mode tournament mengakumulasi skor selama 3-20 ronde.
+
+Panel Rummy memakai tombol:
+
+- **Ikut Main**
+- **Mulai Game**
+- **Lihat / Buang Kartu**
+- **Ambil Deck**
+- **Ambil Buangan**
+- **Refresh Meja**
+- **Vote End Game**
+
+Dokumen plan lengkap ada di:
+
+```text
+docs/RUMMY_MODE_PLAN.md
 ```

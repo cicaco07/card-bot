@@ -9,17 +9,20 @@ import discord
 from discord import app_commands
 
 from poker.game import PokerGameError, PokerStatus
+from rummy.game import RummyGameError, RummyStatus
 from uno.game import GameStatus, UnoGameError
 
 from .changelog import format_changelog_entry, format_public_changelog_entry, latest_changelog_entry, semver_tuple
 from .client import bot, tree
-from .constants import APP_VERSION, COLOR_CHOICES, POKER_MODE_CHOICES
+from .constants import APP_VERSION, COLOR_CHOICES, POKER_MODE_CHOICES, RUMMY_MODE_CHOICES
 from .presentation.poker import poker_hand_text, poker_hand_visuals, poker_table_text, poker_table_visuals
+from .presentation.rummy import rummy_hand_text, rummy_hand_visuals, rummy_table_text, rummy_table_visuals
 from .presentation.uno import hand_text, hand_visuals, table_text, table_visuals
-from .sessions import PokerSession, UnoSession, get_poker_session, get_session, require_channel_id
-from .state import changelog_seen_versions_by_user, poker_sessions_by_channel, sessions_by_channel
+from .sessions import PokerSession, RummySession, UnoSession, get_poker_session, get_rummy_session, get_session, require_channel_id
+from .state import changelog_seen_versions_by_user, poker_sessions_by_channel, rummy_sessions_by_channel, sessions_by_channel
 from .ui.common import reply_error
 from .ui.poker import PokerHandView, poker_table_view, refresh_poker_table_message
+from .ui.rummy import RummyHandView, refresh_rummy_table_message, rummy_table_view
 from .ui.uno import HandView, add_result_log, refresh_table_message, table_view
 
 
@@ -296,4 +299,57 @@ async def poker_status(interaction: discord.Interaction) -> None:
         await refresh_poker_table_message(session)
         await interaction.response.send_message("Meja Remi Poker direfresh.", ephemeral=True)
     except PokerGameError as error:
+        await reply_error(interaction, error)
+
+
+@tree.command(name="rummy-start", description="Tampilkan meja Rummy interaktif di channel ini.")
+@app_commands.describe(
+    mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
+    rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+)
+@app_commands.choices(mode=RUMMY_MODE_CHOICES)
+async def rummy_start(
+    interaction: discord.Interaction,
+    mode: str = "regular",
+    rounds: app_commands.Range[int, 3, 20] = 3,
+) -> None:
+    try:
+        channel_id = require_channel_id(interaction)
+        existing = rummy_sessions_by_channel.get(channel_id)
+        if existing and (existing.game.status != RummyStatus.FINISHED or existing.tournament_between_rounds):
+            raise RummyGameError("Sudah ada meja Rummy aktif di channel ini.")
+        session = RummySession(channel_id, interaction.user.id, mode=mode, tournament_total_rounds=rounds)
+        session.game.add_player(interaction.user.id, interaction.user.display_name)
+        session.add_log(f"Lobby Rummy dibuat oleh {interaction.user.display_name}.")
+        rummy_sessions_by_channel[channel_id] = session
+        embed, files = rummy_table_visuals(session)
+        await interaction.response.send_message(rummy_table_text(session), embed=embed, files=files, view=rummy_table_view(session))
+        session.table_message_id = (await interaction.original_response()).id
+    except RummyGameError as error:
+        await reply_error(interaction, error)
+
+
+@tree.command(name="rummy-hand", description="Fallback: lihat kartu Rummy tanganmu secara private.")
+async def rummy_hand(interaction: discord.Interaction) -> None:
+    try:
+        session = get_rummy_session(interaction.channel_id)
+        embed, files = await asyncio.to_thread(rummy_hand_visuals, session.game, interaction.user.id)
+        await interaction.response.send_message(
+            rummy_hand_text(session.game, interaction.user.id),
+            embed=embed,
+            files=files,
+            view=RummyHandView(session.channel_id, interaction.user.id),
+            ephemeral=True,
+        )
+    except RummyGameError as error:
+        await reply_error(interaction, error)
+
+
+@tree.command(name="rummy-status", description="Fallback: refresh status meja Rummy.")
+async def rummy_status(interaction: discord.Interaction) -> None:
+    try:
+        session = get_rummy_session(interaction.channel_id)
+        await refresh_rummy_table_message(session)
+        await interaction.response.send_message("Meja Rummy direfresh.", ephemeral=True)
+    except RummyGameError as error:
         await reply_error(interaction, error)

@@ -5,6 +5,19 @@ from __future__ import annotations
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.0",
+        "title": "Mode Rummy regular dan tournament",
+        "date": "2026-05-31",
+        "changes": [
+            "Menambahkan mode Rummy dengan command /rummy-start, lobby interaktif, dan kartu tangan private.",
+            "Menambahkan meld run dan set, dukungan dua joker, draw dari deck, serta pengambilan kartu buangan maksimal 7 kartu teratas.",
+            "Menambahkan closed card dengan bonus angka +50, royal card +100, dan Ace +150.",
+            "Menambahkan perhitungan skor meld positif dan kartu sisa negatif saat ronde berakhir.",
+            "Menambahkan mode Rummy Tournament dengan pilihan 3-20 ronde dan scoreboard akumulatif.",
+            "Merapikan struktur internal CardBot menjadi modul engine, presentasi, UI, command, dan app yang terpisah.",
+        ],
+    },
+    {
         "version": "1.0.1",
         "title": "Poker Tournament dan penyempurnaan bombcard",
         "date": "2026-05-29",

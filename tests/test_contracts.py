@@ -10,12 +10,13 @@ from cardbot.client import tree
 from poker import PokerCard, PokerGame, PokerGameError
 from poker.assets import render_play_image, render_poker_hand_image
 from poker.game import compare_combinations, evaluate_combination
+from rummy import RummyCard, RummyGame, RummyGameError
 from uno import Card, UnoGame, UnoGameError
 from uno.card_assets import render_card_image, render_hand_image
 
 
 def test_package_exports_are_stable() -> None:
-    assert all((Card, UnoGame, UnoGameError, PokerCard, PokerGame, PokerGameError))
+    assert all((Card, UnoGame, UnoGameError, PokerCard, PokerGame, PokerGameError, RummyCard, RummyGame, RummyGameError))
     assert callable(evaluate_combination)
     assert callable(compare_combinations)
 
@@ -32,15 +33,20 @@ def test_refactored_modules_import_without_cycles() -> None:
         "cardbot.text_utils",
         "cardbot.presentation.uno",
         "cardbot.presentation.poker",
+        "cardbot.presentation.rummy",
         "cardbot.timer",
         "cardbot.ui.common",
         "cardbot.ui.log_utils",
         "cardbot.ui.uno",
         "cardbot.ui.poker",
+        "cardbot.ui.rummy",
         "poker.cards",
         "poker.combinations",
         "poker.game",
         "poker.assets",
+        "rummy.cards",
+        "rummy.game",
+        "rummy.assets",
         "uno.game",
         "uno.card_assets",
     ]:
@@ -69,6 +75,9 @@ def test_slash_command_snapshot() -> None:
         ("poker-start", "Tampilkan meja Remi Poker interaktif di channel ini.", [("mode", False), ("rounds", False)]),
         ("poker-hand", "Fallback: lihat kartu Remi Poker tanganmu secara private.", []),
         ("poker-status", "Fallback: refresh status meja Remi Poker.", []),
+        ("rummy-start", "Tampilkan meja Rummy interaktif di channel ini.", [("mode", False), ("rounds", False)]),
+        ("rummy-hand", "Fallback: lihat kartu Rummy tanganmu secara private.", []),
+        ("rummy-status", "Fallback: refresh status meja Rummy.", []),
     ]
 
 

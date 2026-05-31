@@ -4,6 +4,8 @@ from PIL import Image
 
 from poker.assets import render_play_image, render_poker_hand_image
 from poker.game import PokerCard
+from rummy.assets import render_rummy_hand_image
+from rummy.cards import RummyCard
 from uno.card_assets import render_hand_image
 from uno.game import Card
 
@@ -22,3 +24,8 @@ def test_poker_hand_and_play_layout_formula() -> None:
     poker_cards = [PokerCard("4", "diamonds")] * 6
     assert _image_info(render_poker_hand_image(poker_cards, 0)) == ("RGB", (664, 432), "poker_hand.jpg")
     assert _image_info(render_play_image(poker_cards[:3])) == ("RGB", (412, 262), "poker_table.jpg")
+
+
+def test_rummy_hand_layout_formula_supports_joker() -> None:
+    cards = [RummyCard("JOKER", joker_color="black"), *[RummyCard("4", "diamonds")] * 5]
+    assert _image_info(render_rummy_hand_image(cards, 0)) == ("RGB", (664, 432), "rummy_hand.jpg")

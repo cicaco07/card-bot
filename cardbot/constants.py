@@ -3,7 +3,7 @@
 from discord import app_commands
 
 
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.1.0"
 
 COLOR_CHOICES = [
     app_commands.Choice(name="Merah", value="red"),
@@ -13,6 +13,11 @@ COLOR_CHOICES = [
 ]
 
 POKER_MODE_CHOICES = [
+    app_commands.Choice(name="Regular", value="regular"),
+    app_commands.Choice(name="Tournament", value="tournament"),
+]
+
+RUMMY_MODE_CHOICES = [
     app_commands.Choice(name="Regular", value="regular"),
     app_commands.Choice(name="Tournament", value="tournament"),
 ]

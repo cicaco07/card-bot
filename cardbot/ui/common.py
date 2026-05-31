@@ -5,10 +5,11 @@ from __future__ import annotations
 import discord
 
 from poker.game import PokerGameError
+from rummy.game import RummyGameError
 
 
 async def reply_error(interaction: discord.Interaction, error: Exception) -> None:
-    prefix = "Remi Poker" if isinstance(error, PokerGameError) else "UNO"
+    prefix = "Rummy" if isinstance(error, RummyGameError) else "Remi Poker" if isinstance(error, PokerGameError) else "UNO"
     message = f"{prefix}: {error}"
     if interaction.response.is_done():
         await interaction.followup.send(message, ephemeral=True)

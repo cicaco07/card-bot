@@ -6,6 +6,17 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.0 - 2026-05-31
+
+Mode Rummy regular dan tournament.
+
+- Menambahkan mode Rummy dengan command `/rummy-start`, lobby interaktif, dan kartu tangan private.
+- Menambahkan meld run dan set, dukungan dua joker, draw dari deck, serta pengambilan kartu buangan maksimal 7 kartu teratas.
+- Menambahkan closed card dengan bonus angka +50, royal card +100, Ace +150, dan joker +250.
+- Menambahkan perhitungan skor meld positif dan kartu sisa negatif saat ronde berakhir.
+- Menambahkan mode Rummy Tournament dengan pilihan 3-20 ronde dan scoreboard akumulatif.
+- Merapikan struktur internal CardBot menjadi modul engine, presentasi, UI, command, dan app yang terpisah.
+
 ## 1.0.1 - 2026-05-29
 
 Poker Tournament dan penyempurnaan bombcard.
