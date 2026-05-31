@@ -2,3 +2,7 @@ discord.py>=2.4,<3
 python-dotenv>=1.0,<2
 Pillow>=10,<13
 CairoSVG>=2.7,<3
+
+# Development dependencies (testing safety net for the clean-code refactor)
+pytest>=8,<10
+hypothesis>=6,<7
