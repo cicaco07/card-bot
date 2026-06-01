@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.11",
+        "title": "Rule Ace dan konfirmasi ambil buangan Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Melarang mengambil Ace dari buangan dan membuang Ace sebelum pemain membuka meld miliknya sendiri yang tidak memakai Ace.",
+            "Menerapkan larangan juga saat Ace ikut terambil di atas target buangan atau dipakai sebagai closed card.",
+            "Mengubah panel Ambil Buangan menjadi pilihan target dengan tombol Konfirmasi Ambil.",
+        ],
+    },
+    {
         "version": "1.1.10",
         "title": "Closed card terakhir dan penalti flip Rummy",
         "date": "2026-06-01",

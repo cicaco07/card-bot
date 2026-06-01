@@ -36,7 +36,7 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 - Setelah mengambil 1-3 kartu buangan, pemain wajib memilih sendiri meld bukti minimal 3 kartu yang memakai kartu target bersama minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci sebelum pemain boleh membuang kartu.
 - Pemain dapat menurunkan meld dari hand. Meld yang sudah terbuka tidak bisa diganti.
 - Pemain dapat menggabungkan kartu ke meld terbuka milik sendiri atau pemain lain jika hasilnya tetap valid.
-- Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
+- Ace dari buangan belum boleh diambil dan Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld miliknya sendiri yang tidak memakai Ace.
 - Joker boleh menggantikan kartu dalam meld.
 - Joker tidak boleh dibuang sebagai discard biasa.
 - Joker boleh dipakai sebagai closed card.
@@ -172,6 +172,7 @@ Panel game:
 - **Lihat / Buang Kartu**
 - **Ambil Deck**
 - **Ambil Buangan**
+- Pada panel private **Ambil Buangan**, pilih target lalu tekan **Konfirmasi Ambil**.
 - **Refresh Meja**
 - **Vote End Game**
 - Tiga kartu discard teratas ditampilkan sebagai gambar publik.
@@ -185,7 +186,7 @@ Panel private:
 - Tombol **Turunkan Meld**.
 - Tombol **Gabungkan Meld**.
 - Tombol **Closed Card**.
-- Dropdown maksimal 3 kartu buangan teratas.
+- Dropdown maksimal 3 kartu buangan teratas dan tombol **Konfirmasi Ambil**.
 
 ## Test Coverage
 
@@ -195,7 +196,7 @@ Coverage otomatis:
 - Deal awal 7 kartu.
 - Validasi run, set, joker, dan partisi meld.
 - Validasi ambil discard yang langsung membentuk meld.
-- Validasi meld bukti terkunci, pembatasan top-3 discard, discard Ace, dan Go Rummy.
+- Validasi meld bukti terkunci, pembatasan top-3 discard, draw/discard Ace, dan Go Rummy.
 - Joker ditolak sebagai discard biasa tetapi diterima sebagai closed card.
 - Scoring meld, deadwood, dan penalti flip card.
 - Akumulasi skor tournament.

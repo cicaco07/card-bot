@@ -168,7 +168,7 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas, lalu tekan **Konfirmasi Ambil**. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 
@@ -191,12 +191,16 @@ class RummyGameView(discord.ui.View):
 
 
 class RummyDiscardSelect(discord.ui.Select):
-    def __init__(self, channel_id: int, user_id: int) -> None:
+    def __init__(self, channel_id: int, user_id: int, selected_depth: int | None = None) -> None:
         self.channel_id, self.user_id = channel_id, user_id
         game = get_rummy_session(channel_id).game
         options = [
-            discord.SelectOption(label=f"{depth}. {card.activity_label}{self._discarded_by_name(game, user_id)}"[:100], value=str(depth))
-            for depth, (card, user_id) in enumerate(game.visible_discard_details(), 1)
+            discord.SelectOption(
+                label=f"{depth}. {card.activity_label}{self._discarded_by_name(game, discarded_by_user_id)}"[:100],
+                value=str(depth),
+                default=depth == selected_depth,
+            )
+            for depth, (card, discarded_by_user_id) in enumerate(game.visible_discard_details(), 1)
         ]
         super().__init__(placeholder="Pilih kartu buangan", options=options or [discord.SelectOption(label="Tidak ada buangan", value="empty")])
 
@@ -209,19 +213,40 @@ class RummyDiscardSelect(discord.ui.Select):
         try:
             if interaction.user.id != self.user_id or self.values[0] == "empty":
                 raise RummyGameError("Tidak ada kartu buangan yang bisa dipilih.")
-            session = get_rummy_session(self.channel_id)
-            result = session.game.draw_from_discard(self.user_id, int(self.values[0]))
-            add_action_log(session, result.public_messages)
-            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
-            await refresh_rummy_table_message(session)
+            selected_depth = int(self.values[0])
+            game = get_rummy_session(self.channel_id).game
+            discards = game.visible_discards()
+            if selected_depth < 1 or selected_depth > len(discards):
+                raise RummyGameError("Kartu buangan itu sudah tidak tersedia. Buka kembali panel Ambil Buangan.")
+            selected_card = discards[selected_depth - 1]
+            await interaction.response.edit_message(
+                content=f"Pilihan buangan: **{selected_depth}. {selected_card.activity_label}**. Tekan **Konfirmasi Ambil** untuk mengambil kartu.",
+                view=RummyDiscardView(self.channel_id, self.user_id, selected_depth),
+            )
         except RummyGameError as error:
             await reply_error(interaction, error)
 
 
 class RummyDiscardView(discord.ui.View):
-    def __init__(self, channel_id: int, user_id: int) -> None:
+    def __init__(self, channel_id: int, user_id: int, selected_depth: int | None = None) -> None:
         super().__init__(timeout=60)
-        self.add_item(RummyDiscardSelect(channel_id, user_id))
+        self.channel_id, self.user_id, self.selected_depth = channel_id, user_id, selected_depth
+        self.add_item(RummyDiscardSelect(channel_id, user_id, selected_depth))
+
+    @discord.ui.button(label="Konfirmasi Ambil", style=discord.ButtonStyle.success)
+    async def confirm_draw_discard(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            if interaction.user.id != self.user_id:
+                raise RummyGameError("Ini panel pengambilan buangan pemain lain.")
+            if self.selected_depth is None:
+                raise RummyGameError("Pilih satu kartu buangan sebelum menekan Konfirmasi Ambil.")
+            session = get_rummy_session(self.channel_id)
+            result = session.game.draw_from_discard(self.user_id, self.selected_depth)
+            add_action_log(session, result.public_messages)
+            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
+            await refresh_rummy_table_message(session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
 
 
 class RummyHandSelect(discord.ui.Select):

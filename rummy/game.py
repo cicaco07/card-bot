@@ -147,6 +147,10 @@ class RummyGame:
         target_card = discards[depth - 1]
         target_discarder_user_id = self.discarded_by_user_ids[-depth] if len(self.discarded_by_user_ids) >= depth else None
         picked_cards = self.discard_pile[-depth:]
+        if any(card.rank == "A" for card in picked_cards) and not self._has_non_ace_opened_meld(player):
+            raise RummyGameError(
+                "Ace dari buangan hanya boleh diambil setelah kamu menurunkan minimal satu meld milikmu yang tidak memakai Ace."
+            )
         required_meld_size = 3
         if self._discard_draw_meld(player.hand, target_card, picked_cards[1:], required_meld_size) is None:
             raise RummyGameError(
@@ -266,8 +270,8 @@ class RummyGame:
         card = player.hand[card_number - 1]
         if card.is_joker and not close:
             raise RummyGameError("Joker tidak boleh dibuang karena akan mengakhiri sesi permainan.")
-        if card.rank == "A" and not close and not player.opened_melds:
-            raise RummyGameError("Ace belum boleh dibuang sebelum kamu menurunkan minimal satu meld.")
+        if card.rank == "A" and not self._has_non_ace_opened_meld(player):
+            raise RummyGameError("Ace hanya boleh dibuang setelah kamu menurunkan minimal satu meld milikmu yang tidak memakai Ace.")
 
         remaining = player.hand[: card_number - 1] + player.hand[card_number:]
         if close and remaining and not can_partition_into_melds(remaining):
@@ -396,6 +400,10 @@ class RummyGame:
             raise RummyGameError(
                 f"Turunkan meld bukti yang memakai {self.required_discard_meld_card.activity_label} terlebih dahulu."
             )
+
+    @staticmethod
+    def _has_non_ace_opened_meld(player: RummyPlayer) -> bool:
+        return any(all(card.rank != "A" for card in meld) for meld in player.opened_melds)
 
     def _ensure_draw_turn(self, user_id: int) -> None:
         self._ensure_playing()

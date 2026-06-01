@@ -281,18 +281,57 @@ def test_closed_card_accepts_last_card_and_applies_flip_penalty_to_discarder() -
     }
 
 
-def test_ace_discard_requires_opened_meld() -> None:
+def test_ace_discard_requires_own_non_ace_opened_meld() -> None:
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [RummyPlayer(1, "Alice", cards(("A", "hearts"), ("9", "clubs"))), RummyPlayer(2, "Bob")]
     game.awaiting_discard_user_id = 1
-    with pytest.raises(RummyGameError, match="Ace belum boleh dibuang"):
+    with pytest.raises(RummyGameError, match="Ace hanya boleh dibuang"):
         game.discard_card(1, 1)
+    with pytest.raises(RummyGameError, match="Ace hanya boleh dibuang"):
+        game.discard_card(1, 1, close=True)
 
     game.players[0].opened_melds = [tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts")))]
     game.deck = cards(("5", "clubs"))
     game.last_draw_source = "deck"
     assert game.discard_card(1, 1).public_messages[0] == "Alice membuang A ♥️ setelah mengambil dari deck."
+
+
+def test_ace_draw_from_discard_requires_own_non_ace_opened_meld() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [
+        RummyPlayer(1, "Alice", cards(("Q", "hearts"), ("K", "hearts"))),
+        RummyPlayer(2, "Bob", opened_melds=[tuple(cards(("2", "clubs"), ("3", "clubs"), ("4", "clubs")))]),
+    ]
+    game.discard_pile = cards(("A", "hearts"))
+    with pytest.raises(RummyGameError, match="Ace dari buangan hanya boleh diambil"):
+        game.draw_from_discard(1, 1)
+
+    game.players[0].opened_melds = [tuple(cards(("Q", "clubs"), ("K", "clubs"), ("A", "clubs")))]
+    with pytest.raises(RummyGameError, match="Ace dari buangan hanya boleh diambil"):
+        game.draw_from_discard(1, 1)
+
+    game.players[0].opened_melds = [tuple(cards(("2", "clubs"), ("3", "clubs"), ("4", "clubs")))]
+    assert game.draw_from_discard(1, 1).public_messages == [
+        "Alice mengambil 1 kartu dari buangan dengan target A ♥️.",
+        "Alice wajib menurunkan meld bukti minimal 3 kartu yang memakai A ♥️ sebelum membuang kartu.",
+    ]
+
+
+def test_ace_above_discard_target_also_requires_own_non_ace_opened_meld() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"), ("A", "clubs"))
+    with pytest.raises(RummyGameError, match="Ace dari buangan hanya boleh diambil"):
+        game.draw_from_discard(1, 2)
+
+    game.players[0].opened_melds = [tuple(cards(("7", "clubs"), ("8", "clubs"), ("9", "clubs")))]
+    assert game.draw_from_discard(1, 2).public_messages == [
+        "Alice mengambil 2 kartu dari buangan dengan target 4 ♥️.",
+        "Alice wajib menurunkan meld bukti minimal 3 kartu yang memakai 4 ♥️ sebelum membuang kartu.",
+    ]
 
 
 def test_lay_down_meld_removes_cards_from_hand_and_locks_them() -> None:

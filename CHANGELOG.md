@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.11 - 2026-06-01
+
+Rule Ace dan konfirmasi ambil buangan Rummy.
+
+- Melarang mengambil Ace dari buangan dan membuang Ace sebelum pemain membuka meld miliknya sendiri yang tidak memakai Ace.
+- Menerapkan larangan juga saat Ace ikut terambil di atas target buangan atau dipakai sebagai closed card.
+- Mengubah panel **Ambil Buangan** menjadi pilihan target dengan tombol **Konfirmasi Ambil**.
+
 ## 1.1.10 - 2026-06-01
 
 Closed card terakhir dan penalti flip Rummy.

@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.10`
+Versi saat ini: `1.1.11`
 
 Command changelog:
 
@@ -292,7 +292,7 @@ Rules utama:
 - Panel 3 buangan teratas menampilkan pemain yang membuang setiap kartu.
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
 - Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
-- Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
+- Ace dari buangan belum boleh diambil dan Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld miliknya sendiri yang tidak memakai Ace.
 - Tombol **Closed Card** mengakhiri ronde. Kartu terakhir boleh langsung dipakai sebagai closed card; jika masih ada kartu lain, semuanya wajib dapat menjadi meld.
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
@@ -311,6 +311,7 @@ Panel Rummy memakai tombol:
 - **Gabungkan Meld** untuk menambahkan kartu ke meld terbuka yang masih valid
 - **Ambil Deck**
 - **Ambil Buangan**
+- Pada panel private **Ambil Buangan**, pilih target lalu tekan **Konfirmasi Ambil**.
 - **Refresh Meja**
 - **Vote End Game**
 
