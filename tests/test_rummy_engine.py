@@ -15,6 +15,7 @@ from rummy.game import (
     closed_card_bonus,
     is_valid_meld,
     score_hand,
+    score_hand_breakdown,
 )
 
 
@@ -57,25 +58,32 @@ def test_meld_validation_supports_run_set_and_joker() -> None:
 def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_target() -> None:
     game = RummyGame()
     game.status = RummyStatus.PLAYING
-    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"), ("6", "hearts"))), RummyPlayer(2, "Bob")]
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"))), RummyPlayer(2, "Bob", cards(("8", "clubs")))]
+    game.deck = cards(("K", "spades"))
     game.discard_pile = cards(("4", "hearts"), ("9", "clubs"))
+    game.discarded_by_user_ids = [2, 1]
     assert game.draw_from_discard(1, 2).public_messages == [
-        "Alice mengambil 2 kartu dari buangan dengan target 4 of Hearts.",
-        "Alice wajib menurunkan meld bukti 4 kartu yang memakai 4 of Hearts sebelum membuang kartu.",
+        "Alice mengambil 2 kartu dari buangan dengan target 4 ♥️.",
+        "Alice wajib menurunkan meld bukti 3 kartu yang memakai 4 ♥️ sebelum membuang kartu.",
     ]
     assert game.discard_pile == []
-    assert game.players[0].hand == cards(("9", "clubs"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"), ("6", "hearts"))
+    assert game.discarded_by_user_ids == []
+    assert game.players[0].hand == cards(("9", "clubs"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"))
     assert game.players[0].opened_melds == []
     with pytest.raises(RummyGameError, match="Turunkan meld bukti"):
         game.discard_card(1, 1)
-    with pytest.raises(RummyGameError, match="wajib terdiri dari 4 kartu"):
-        game.lay_down_meld(1, [2, 3, 4])
-    assert game.lay_down_meld(1, [2, 3, 4, 5]).public_messages == [
-        "Alice menurunkan meld bukti dan menguncinya: 3 of Hearts, 4 of Hearts, 5 of Hearts, 6 of Hearts."
+    assert game.lay_down_meld(1, [2, 3, 4]).public_messages == [
+        "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️."
     ]
     assert game.players[0].hand == cards(("9", "clubs"))
-    assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts"), ("6", "hearts")))]
+    assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
     assert game.required_discard_meld_card is None
+    assert game.discard_card(1, 1).public_messages == [
+        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Giliran berikutnya: Bob.",
+    ]
+    assert game.discard_pile == cards(("9", "clubs"))
+    assert game.discarded_by_user_ids == [1]
 
     game = RummyGame()
     game.status = RummyStatus.PLAYING
@@ -93,14 +101,14 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
     with pytest.raises(RummyGameError, match="wajib terdiri dari 3 kartu"):
         game.lay_down_meld(1, [1, 2, 3, 4])
     assert game.lay_down_meld(1, [1, 2, 3]).public_messages == [
-        "Alice menurunkan meld bukti dan menguncinya: 3 of Hearts, 4 of Hearts, 5 of Hearts."
+        "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️."
     ]
 
     game = RummyGame()
     game.status = RummyStatus.PLAYING
-    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"))), RummyPlayer(2, "Bob")]
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("6", "hearts"))), RummyPlayer(2, "Bob")]
     game.discard_pile = cards(("4", "hearts"), ("9", "clubs"))
-    with pytest.raises(RummyGameError, match="meld bukti 4 kartu"):
+    with pytest.raises(RummyGameError, match="meld bukti 3 kartu"):
         game.draw_from_discard(1, 2)
 
     game = RummyGame()
@@ -137,7 +145,7 @@ def test_empty_hand_from_regular_discard_continues_round() -> None:
     game.awaiting_discard_user_id = 1
     game.last_draw_source = "deck"
     assert game.discard_card(1, 1).public_messages == [
-        "Alice menghabiskan seluruh kartu dengan membuang 9 of Clubs. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️. Go Rummy aktif untuk perhitungan skor akhir.",
         "Giliran berikutnya: Bob.",
     ]
     assert game.status == RummyStatus.PLAYING
@@ -147,7 +155,13 @@ def test_empty_hand_from_regular_discard_continues_round() -> None:
 def test_visible_discards_are_limited_to_three_cards() -> None:
     game = RummyGame()
     game.discard_pile = cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"))
+    game.discarded_by_user_ids = [1, 2, 1, 2]
     assert game.visible_discards() == cards(("5", "hearts"), ("4", "hearts"), ("3", "hearts"))
+    assert game.visible_discard_details() == [
+        (RummyCard("5", "hearts"), 2),
+        (RummyCard("4", "hearts"), 1),
+        (RummyCard("3", "hearts"), 2),
+    ]
 
 
 def test_draw_deck_then_discard_preserves_cards_and_advances_turn() -> None:
@@ -180,6 +194,26 @@ def test_regular_discard_rejects_joker_but_close_allows_it() -> None:
     assert result.closed_user_id == 1
     assert result.scores[1] == 530
     assert result.scores[2] == -10
+    assert game.score_breakdowns == {
+        1: {
+            "opened_meld_points": 0,
+            "hand_meld_points": 15,
+            "deadwood_points": 0,
+            "closed_bonus": 250,
+            "subtotal": 265,
+            "go_rummy_multiplier": 2,
+            "total": 530,
+        },
+        2: {
+            "opened_meld_points": 0,
+            "hand_meld_points": 0,
+            "deadwood_points": 5,
+            "closed_bonus": 0,
+            "subtotal": -5,
+            "go_rummy_multiplier": 2,
+            "total": -10,
+        },
+    }
     assert game.go_rummy_user_id == 1
 
 
@@ -194,7 +228,7 @@ def test_ace_discard_requires_opened_meld() -> None:
     game.players[0].opened_melds = [tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts")))]
     game.deck = cards(("5", "clubs"))
     game.last_draw_source = "deck"
-    assert game.discard_card(1, 1).public_messages[0] == "Alice membuang Ace of Hearts setelah mengambil dari deck."
+    assert game.discard_card(1, 1).public_messages[0] == "Alice membuang A ♥️ setelah mengambil dari deck."
 
 
 def test_lay_down_meld_removes_cards_from_hand_and_locks_them() -> None:
@@ -206,7 +240,7 @@ def test_lay_down_meld_removes_cards_from_hand_and_locks_them() -> None:
     ]
     game.awaiting_discard_user_id = 1
     result = game.lay_down_meld(1, [1, 2, 3])
-    assert result.public_messages == ["Alice menurunkan meld dan menguncinya: 2 of Hearts, 3 of Hearts, 4 of Hearts."]
+    assert result.public_messages == ["Alice menurunkan meld dan menguncinya: 2 ♥️, 3 ♥️, 4 ♥️."]
     assert game.players[0].hand == cards(("9", "clubs"))
     assert game.players[0].opened_melds == [tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts")))]
 
@@ -220,7 +254,7 @@ def test_lay_off_cards_extends_opened_meld() -> None:
     ]
     game.awaiting_discard_user_id = 1
     result = game.lay_off_cards(1, 2, 0, [1])
-    assert result.public_messages == ["Alice menggabungkan 5 of Hearts ke meld terbuka Bob."]
+    assert result.public_messages == ["Alice menggabungkan 5 ♥️ ke meld terbuka Bob."]
     assert game.players[0].hand == cards(("9", "clubs"))
     assert game.players[1].opened_melds == [tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
 
@@ -228,6 +262,7 @@ def test_lay_off_cards_extends_opened_meld() -> None:
 def test_score_and_closed_bonus_rules() -> None:
     hand = cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("A", "clubs"))
     assert score_hand(hand) == 0
+    assert score_hand_breakdown(hand) == (15, 15)
     assert closed_card_bonus(RummyCard("9", "clubs")) == 50
     assert closed_card_bonus(RummyCard("K", "clubs")) == 100
     assert closed_card_bonus(RummyCard("A", "clubs")) == 150

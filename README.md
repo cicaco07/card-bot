@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.1`
+Versi saat ini: `1.1.7`
 
 Command changelog:
 
@@ -13,7 +13,7 @@ Command changelog:
 
 Command ini menampilkan changelog terbaru jika user tersebut belum melihat versi terbaru selama bot berjalan. Jika sudah pernah dilihat, bot hanya memberi info bahwa belum ada changelog baru.
 
-`/publish-changelog` mengirim changelog terbaru ke channel sebagai pesan publik dari bot. Command ini hanya bisa dipakai user dengan permission **Manage Server**. Pilih `mention_everyone: True` jika ingin tampilan highlight seperti pesan yang melakukan ping `@everyone`.
+`/publish-changelog` membaca histori channel lalu mengirim seluruh versi changelog yang belum diposting secara berurutan. Command ini hanya bisa dipakai user dengan permission **Manage Server**. Bot membutuhkan permission **Read Message History** dan **Send Messages**. Pilih `mention_everyone: True` jika ingin ping `@everyone` pada pesan pertama.
 
 Mode yang tersedia:
 
@@ -288,13 +288,16 @@ Rules utama:
 - Pemain 2-4 orang dan mendapat 7 kartu.
 - Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.
 - Setiap giliran ambil satu kartu dari deck atau buangan, lalu buang satu kartu.
-- Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1 kartu wajib meld bukti 3 kartu; mengambil 2-3 kartu wajib meld bukti 4 kartu. Pemain memilih sendiri meld yang memakai kartu target sebelum membuang kartu. Meld lalu dibuka ke semua pemain dan dikunci.
+- Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1-2 kartu wajib meld bukti 3 kartu; mengambil 3 kartu wajib meld bukti 4 kartu. Pemain memilih sendiri meld yang memakai kartu target sebelum membuang kartu. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci.
+- Panel 3 buangan teratas menampilkan pemain yang membuang setiap kartu.
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
 - Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
 - Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
 - Tombol **Closed Card** mengakhiri ronde jika seluruh kartu tersisa sudah menjadi meld.
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
+- Hasil akhir ronde menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, dan multiplier Go Rummy.
+- Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
 - Bonus closed card setelah draw deck: angka +50, J/Q/K +100, Ace +150, joker +250.
 - Go Rummy menggandakan seluruh poin ronde jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut.
 - Mode tournament mengakumulasi skor selama 3-20 ronde.

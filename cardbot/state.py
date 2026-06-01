@@ -14,6 +14,7 @@ sessions_by_channel: dict[int, "UnoSession"] = {}
 poker_sessions_by_channel: dict[int, "PokerSession"] = {}
 rummy_sessions_by_channel: dict[int, "RummySession"] = {}
 changelog_seen_versions_by_user: dict[int, str] = {}
+published_changelog_versions_by_channel: dict[int, set[str]] = {}
 _client: discord.Client | None = None
 
 

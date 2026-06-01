@@ -168,7 +168,7 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1 wajib meld bukti 3 kartu; ambil 2-3 wajib meld bukti 4 kartu. Setelah mengambil, pilih sendiri meld yang memakai kartu target lalu tekan Turunkan Meld:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-2 wajib meld bukti 3 kartu; ambil 3 wajib meld bukti 4 kartu. Kartu target wajib dipakai, sedangkan kartu di atasnya bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 
@@ -193,9 +193,17 @@ class RummyGameView(discord.ui.View):
 class RummyDiscardSelect(discord.ui.Select):
     def __init__(self, channel_id: int, user_id: int) -> None:
         self.channel_id, self.user_id = channel_id, user_id
-        discards = get_rummy_session(channel_id).game.visible_discards()
-        options = [discord.SelectOption(label=f"{depth}. {card.label}"[:100], value=str(depth)) for depth, card in enumerate(discards, 1)]
+        game = get_rummy_session(channel_id).game
+        options = [
+            discord.SelectOption(label=f"{depth}. {card.label}{self._discarded_by_name(game, user_id)}"[:100], value=str(depth))
+            for depth, (card, user_id) in enumerate(game.visible_discard_details(), 1)
+        ]
         super().__init__(placeholder="Pilih kartu buangan", options=options or [discord.SelectOption(label="Tidak ada buangan", value="empty")])
+
+    @staticmethod
+    def _discarded_by_name(game, user_id: int | None) -> str:
+        player = game.get_player(user_id) if user_id is not None else None
+        return f" - dari {player.name}" if player is not None else ""
 
     async def callback(self, interaction: discord.Interaction) -> None:
         try:

@@ -68,7 +68,7 @@ def test_slash_command_snapshot() -> None:
     assert snapshot == [
         ("uno_start", "Tampilkan meja UNO interaktif di channel ini.", []),
         ("changelog", "Cek changelog terbaru CardBot.", []),
-        ("publish-changelog", "Kirim changelog terbaru ke channel sebagai bot.", [("channel", False), ("mention_everyone", False)]),
+        ("publish-changelog", "Kirim changelog yang belum dipublikasikan ke channel.", [("channel", False), ("mention_everyone", False)]),
         ("uno_hand", "Fallback: lihat kartu tanganmu secara private.", []),
         ("uno_status", "Fallback: refresh status meja UNO.", []),
         ("uno_play", "Fallback: mainkan kartu berdasarkan nomor di /uno_hand.", [("card_number", True), ("color", False)]),

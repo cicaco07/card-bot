@@ -32,7 +32,8 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 - Setiap giliran dimulai pada fase draw lalu wajib diakhiri dengan discard.
 - Kartu buangan dapat dipilih dari maksimal 3 kartu teratas.
 - Saat memilih discard lebih dalam, seluruh kartu di atas target ikut diambil ke hand.
-- Setelah mengambil 1 kartu buangan, pemain wajib memilih sendiri meld bukti 3 kartu. Setelah mengambil 2-3 kartu buangan, pemain wajib memilih sendiri meld bukti 4 kartu. Meld wajib memakai kartu target bersama minimal 2 kartu tangan sebelumnya, lalu dibuka ke semua pemain dan dikunci sebelum pemain boleh membuang kartu.
+- Panel 3 buangan teratas menampilkan pemain yang membuang setiap kartu.
+- Setelah mengambil 1-2 kartu buangan, pemain wajib memilih sendiri meld bukti 3 kartu. Setelah mengambil 3 kartu buangan, pemain wajib memilih sendiri meld bukti 4 kartu. Meld wajib memakai kartu target bersama minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci sebelum pemain boleh membuang kartu.
 - Pemain dapat menurunkan meld dari hand. Meld yang sudah terbuka tidak bisa diganti.
 - Pemain dapat menggabungkan kartu ke meld terbuka milik sendiri atau pemain lain jika hasilnya tetap valid.
 - Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
@@ -95,6 +96,7 @@ Saat ronde selesai:
 - Kartu yang masuk meld bernilai positif.
 - Kartu tersisa atau deadwood bernilai negatif.
 - Engine mencari kombinasi meld terbaik secara otomatis.
+- Panel hasil akhir menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, subtotal, dan multiplier Go Rummy.
 
 Bonus closed card setelah draw dari deck:
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from cardbot.presentation.rummy import rummy_lobby_text, rummy_state_text
+from cardbot.presentation.rummy import rummy_finished_text, rummy_lobby_text, rummy_state_text
 from cardbot.sessions import RummySession
 from cardbot.ui.common import reply_error
 from rummy.cards import RummyCard
@@ -46,3 +46,38 @@ def test_rummy_reply_error_prefix() -> None:
 
     asyncio.run(reply_error(SimpleNamespace(response=Response()), RummyGameError("contoh")))
     assert sent == ["Rummy: contoh"]
+
+
+def test_rummy_playing_text_shows_discarding_players() -> None:
+    session = RummySession(channel_id=10, owner_id=99)
+    session.game.status = RummyStatus.PLAYING
+    session.game.players = [
+        RummyPlayer(1, "Alice", [RummyCard("2", "hearts")]),
+        RummyPlayer(2, "Bob", [RummyCard("3", "clubs")]),
+    ]
+    session.game.discard_pile = [RummyCard("4", "diamonds"), RummyCard("5", "clubs")]
+    session.game.discarded_by_user_ids = [1, 2]
+    text = rummy_state_text(session)
+    assert "Kartu buangan teratas: **5 of Clubs** - dibuang oleh <@2>" in text
+    assert "3 buangan teratas:\n- 1. 5 of Clubs - dibuang oleh <@2>\n- 2. 4 of Diamonds - dibuang oleh <@1>" in text
+
+
+def test_rummy_finished_text_shows_score_breakdown() -> None:
+    session = RummySession(channel_id=10, owner_id=99)
+    session.game.status = RummyStatus.FINISHED
+    session.game.players = [RummyPlayer(1, "Alice")]
+    session.game.scores = {1: 120}
+    session.game.score_breakdowns = {
+        1: {
+            "opened_meld_points": 15,
+            "hand_meld_points": 0,
+            "deadwood_points": 5,
+            "closed_bonus": 50,
+            "subtotal": 60,
+            "go_rummy_multiplier": 2,
+            "total": 120,
+        }
+    }
+    text = rummy_finished_text(session)
+    assert "- <@1>: **+120 point**" in text
+    assert "meld terbuka +15, meld tangan +0, deadwood -5, bonus closed +50 = subtotal +60, Go Rummy x2 = total +120" in text

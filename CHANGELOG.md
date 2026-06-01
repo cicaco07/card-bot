@@ -6,6 +6,36 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.7 - 2026-06-01
+
+Publikasi changelog berurutan.
+
+- Mendeteksi versi changelog yang terlewati pada histori channel.
+- Mengirim seluruh changelog publik yang belum diposting secara berurutan.
+- Menyelaraskan versi aplikasi dengan changelog terbaru.
+
+## 1.1.6 - 2026-06-01
+
+Detail skor dan log suit Rummy.
+
+- Menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, subtotal, dan multiplier Go Rummy pada hasil akhir ronde.
+- Meringkas kartu pada log aktivitas dengan simbol suit, misalnya `8 ♥️`.
+
+## 1.1.5 - 2026-06-01
+
+Koreksi meld bukti ambil dua buangan Rummy.
+
+- Mengubah meld bukti saat mengambil 2 kartu buangan menjadi tepat 3 kartu bersama minimal 2 kartu tangan sebelumnya.
+- Membebaskan kartu teratas yang ikut terambil untuk disimpan atau dibuang kembali.
+- Mempertahankan meld bukti tepat 4 kartu saat mengambil 3 kartu buangan.
+
+## 1.1.4 - 2026-06-01
+
+Informasi pembuang kartu Rummy.
+
+- Menampilkan pemain yang membuang setiap kartu pada panel 3 buangan teratas.
+- Menampilkan pemain pembuang kartu pada pilihan draw dari buangan.
+
 ## 1.1.3 - 2026-06-01
 
 Penegasan meld bukti buangan Rummy.

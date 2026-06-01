@@ -2,8 +2,48 @@
 
 from __future__ import annotations
 
+import re
+
 
 CHANGELOG_ENTRIES = [
+    {
+        "version": "1.1.7",
+        "title": "Publikasi changelog berurutan",
+        "date": "2026-06-01",
+        "changes": [
+            "Mendeteksi versi changelog yang terlewati pada histori channel.",
+            "Mengirim seluruh changelog publik yang belum diposting secara berurutan.",
+            "Menyelaraskan versi aplikasi dengan changelog terbaru.",
+        ],
+    },
+    {
+        "version": "1.1.6",
+        "title": "Detail skor dan log suit Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, subtotal, dan multiplier Go Rummy pada hasil akhir ronde.",
+            "Meringkas kartu pada log aktivitas dengan simbol suit, misalnya 8 ♥️.",
+        ],
+    },
+    {
+        "version": "1.1.5",
+        "title": "Koreksi meld bukti ambil dua buangan Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mengubah meld bukti saat mengambil 2 kartu buangan menjadi tepat 3 kartu bersama minimal 2 kartu tangan sebelumnya.",
+            "Membebaskan kartu teratas yang ikut terambil untuk disimpan atau dibuang kembali.",
+            "Mempertahankan meld bukti tepat 4 kartu saat mengambil 3 kartu buangan.",
+        ],
+    },
+    {
+        "version": "1.1.4",
+        "title": "Informasi pembuang kartu Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Menampilkan pemain yang membuang setiap kartu pada panel 3 buangan teratas.",
+            "Menampilkan pemain pembuang kartu pada pilihan draw dari buangan.",
+        ],
+    },
     {
         "version": "1.1.3",
         "title": "Penegasan meld bukti buangan Rummy",
@@ -77,6 +117,8 @@ CHANGELOG_ENTRIES = [
     },
 ]
 
+PUBLIC_CHANGELOG_VERSION_PATTERN = re.compile(r"^## UPDATE v(\d+\.\d+\.\d+)\s*$", re.MULTILINE)
+
 
 def semver_tuple(version: str) -> tuple[int, int, int]:
     major, feature, patch = version.split(".")
@@ -85,6 +127,24 @@ def semver_tuple(version: str) -> tuple[int, int, int]:
 
 def latest_changelog_entry() -> dict[str, object]:
     return max(CHANGELOG_ENTRIES, key=lambda entry: semver_tuple(str(entry["version"])))
+
+
+def public_changelog_version(content: str) -> str | None:
+    match = PUBLIC_CHANGELOG_VERSION_PATTERN.search(content)
+    return match.group(1) if match else None
+
+
+def unpublished_public_changelog_entries(published_versions: set[str]) -> list[dict[str, object]]:
+    ordered_entries = sorted(CHANGELOG_ENTRIES, key=lambda entry: semver_tuple(str(entry["version"])))
+    if not published_versions:
+        return [ordered_entries[-1]]
+    first_published = min(published_versions, key=semver_tuple)
+    return [
+        entry
+        for entry in ordered_entries
+        if semver_tuple(str(entry["version"])) > semver_tuple(first_published)
+        and str(entry["version"]) not in published_versions
+    ]
 
 
 def format_changelog_entry(entry: dict[str, object]) -> str:

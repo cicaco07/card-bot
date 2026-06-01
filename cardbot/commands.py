@@ -12,14 +12,27 @@ from poker.game import PokerGameError, PokerStatus
 from rummy.game import RummyGameError, RummyStatus
 from uno.game import GameStatus, UnoGameError
 
-from .changelog import format_changelog_entry, format_public_changelog_entry, latest_changelog_entry, semver_tuple
+from .changelog import (
+    format_changelog_entry,
+    format_public_changelog_entry,
+    latest_changelog_entry,
+    public_changelog_version,
+    semver_tuple,
+    unpublished_public_changelog_entries,
+)
 from .client import bot, tree
 from .constants import APP_VERSION, COLOR_CHOICES, POKER_MODE_CHOICES, RUMMY_MODE_CHOICES
 from .presentation.poker import poker_hand_text, poker_hand_visuals, poker_table_text, poker_table_visuals
 from .presentation.rummy import rummy_hand_text, rummy_hand_visuals, rummy_table_text, rummy_table_visuals
 from .presentation.uno import hand_text, hand_visuals, table_text, table_visuals
 from .sessions import PokerSession, RummySession, UnoSession, get_poker_session, get_rummy_session, get_session, require_channel_id
-from .state import changelog_seen_versions_by_user, poker_sessions_by_channel, rummy_sessions_by_channel, sessions_by_channel
+from .state import (
+    changelog_seen_versions_by_user,
+    poker_sessions_by_channel,
+    published_changelog_versions_by_channel,
+    rummy_sessions_by_channel,
+    sessions_by_channel,
+)
 from .ui.common import reply_error
 from .ui.poker import PokerHandView, poker_table_view, refresh_poker_table_message
 from .ui.rummy import RummyHandView, refresh_rummy_table_message, rummy_table_view
@@ -27,6 +40,19 @@ from .ui.uno import HandView, add_result_log, refresh_table_message, table_view
 
 
 commands_synced = False
+
+
+async def _published_changelog_versions(destination: discord.TextChannel) -> set[str]:
+    versions = set(published_changelog_versions_by_channel.get(destination.id, set()))
+    if bot.user is not None:
+        async for message in destination.history(limit=1000):
+            if message.author.id != bot.user.id:
+                continue
+            version = public_changelog_version(message.content)
+            if version is not None:
+                versions.add(version)
+    published_changelog_versions_by_channel[destination.id] = versions
+    return versions
 
 
 @bot.event
@@ -92,7 +118,7 @@ async def changelog(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(format_changelog_entry(latest), ephemeral=True)
 
 
-@tree.command(name="publish-changelog", description="Kirim changelog terbaru ke channel sebagai bot.")
+@tree.command(name="publish-changelog", description="Kirim changelog yang belum dipublikasikan ke channel.")
 @app_commands.default_permissions(manage_guild=True)
 @app_commands.describe(
     channel="Channel tujuan. Kosongkan untuk memakai channel ini.",
@@ -123,7 +149,6 @@ async def publish_changelog(
         )
         return
 
-    latest = latest_changelog_entry()
     await interaction.response.defer(ephemeral=True, thinking=True)
     bot_member = interaction.guild.me
     if bot_member is None and bot.user is not None:
@@ -145,18 +170,18 @@ async def publish_changelog(
             ephemeral=True,
         )
         return
+    if not bot_permissions.read_message_history:
+        await interaction.followup.send(
+            f"Bot perlu permission **Read Message History** di {destination.mention} agar versi changelog tidak terlewati.",
+            ephemeral=True,
+        )
+        return
 
     try:
-        message = await asyncio.wait_for(
-            destination.send(
-                format_public_changelog_entry(latest, mention_everyone),
-                allowed_mentions=discord.AllowedMentions(everyone=mention_everyone),
-            ),
-            timeout=15,
-        )
+        published_versions = await asyncio.wait_for(_published_changelog_versions(destination), timeout=15)
     except TimeoutError:
         await interaction.followup.send(
-            "Bot terlalu lama saat mencoba mengirim changelog. Coba lagi atau cek koneksi host bot.",
+            "Bot terlalu lama saat membaca histori changelog. Coba lagi atau cek koneksi host bot.",
             ephemeral=True,
         )
         return
@@ -173,8 +198,51 @@ async def publish_changelog(
         )
         return
 
+    entries = unpublished_public_changelog_entries(published_versions)
+    if not entries:
+        await interaction.followup.send(
+            f"Semua changelog sampai v{latest_changelog_entry()['version']} sudah pernah dikirim ke {destination.mention}.",
+            ephemeral=True,
+        )
+        return
+
     reaction_error = not bot_permissions.add_reactions
-    if not reaction_error:
+    sent_versions: list[str] = []
+    for entry in entries:
+        ping_everyone = mention_everyone and not sent_versions
+        try:
+            message = await asyncio.wait_for(
+                destination.send(
+                    format_public_changelog_entry(entry, ping_everyone),
+                    allowed_mentions=discord.AllowedMentions(everyone=ping_everyone),
+                ),
+                timeout=15,
+            )
+        except TimeoutError:
+            await interaction.followup.send(
+                "Bot terlalu lama saat mencoba mengirim changelog. Jalankan command lagi untuk melanjutkan versi yang tersisa.",
+                ephemeral=True,
+            )
+            return
+        except discord.Forbidden:
+            await interaction.followup.send(
+                f"Discord menolak pesan ke {destination.mention}. Cek permission bot di channel itu.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException as error:
+            await interaction.followup.send(
+                f"Gagal mengirim changelog: `{error}`",
+                ephemeral=True,
+            )
+            return
+
+        version = str(entry["version"])
+        sent_versions.append(version)
+        published_versions.add(version)
+        published_changelog_versions_by_channel[destination.id] = set(published_versions)
+        if reaction_error:
+            continue
         for emoji in ("\U0001f525", "\U0001f44d", "\u2764\ufe0f"):
             try:
                 await asyncio.wait_for(message.add_reaction(emoji), timeout=5)
@@ -183,8 +251,9 @@ async def publish_changelog(
                 break
 
     note = " Reaksi default gagal ditambahkan; cek permission **Add Reactions**." if reaction_error else ""
+    versions_text = ", ".join(f"v{version}" for version in sent_versions)
     await interaction.followup.send(
-        f"Changelog v{latest['version']} sudah dikirim ke {destination.mention}.{note}",
+        f"Changelog {versions_text} sudah dikirim ke {destination.mention}.{note}",
         ephemeral=True,
     )
 

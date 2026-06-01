@@ -48,6 +48,7 @@ class RummyGame:
         self.players: list[RummyPlayer] = []
         self.deck: list[RummyCard] = []
         self.discard_pile: list[RummyCard] = []
+        self.discarded_by_user_ids: list[int | None] = []
         self.turn_index = 0
         self.awaiting_discard_user_id: int | None = None
         self.last_draw_source: str | None = None
@@ -55,6 +56,7 @@ class RummyGame:
         self.required_discard_meld_hand_cards: tuple[RummyCard, ...] = ()
         self.required_discard_meld_size: int | None = None
         self.scores: dict[int, int] = {}
+        self.score_breakdowns: dict[int, dict[str, int]] = {}
         self.closed_user_id: int | None = None
         self.closed_card: RummyCard | None = None
         self.go_rummy_user_id: int | None = None
@@ -82,6 +84,7 @@ class RummyGame:
             player.opened_melds = []
             player.had_opened_meld_before_turn = False
         self.discard_pile = []
+        self.discarded_by_user_ids = []
         self.turn_index = 0
         self.awaiting_discard_user_id = None
         self.last_draw_source = None
@@ -89,6 +92,7 @@ class RummyGame:
         self.required_discard_meld_hand_cards = ()
         self.required_discard_meld_size = None
         self.scores = {}
+        self.score_breakdowns = {}
         self.closed_user_id = None
         self.closed_card = None
         self.go_rummy_user_id = None
@@ -113,6 +117,11 @@ class RummyGame:
     def visible_discards(self) -> list[RummyCard]:
         return list(reversed(self.discard_pile[-self.max_discard_depth :]))
 
+    def visible_discard_details(self) -> list[tuple[RummyCard, int | None]]:
+        discards = self.visible_discards()
+        user_ids = list(reversed(self.discarded_by_user_ids[-self.max_discard_depth :]))
+        return list(zip(discards, [*user_ids, *([None] * (len(discards) - len(user_ids)))]))
+
     def draw_from_deck(self, user_id: int) -> RummyActionResult:
         self._ensure_draw_turn(user_id)
         if not self.deck:
@@ -133,7 +142,7 @@ class RummyGame:
         player = self.current_player
         target_card = discards[depth - 1]
         picked_cards = self.discard_pile[-depth:]
-        required_meld_size = 3 if depth == 1 else 4
+        required_meld_size = 4 if depth == 3 else 3
         if self._discard_draw_meld(player.hand, target_card, picked_cards[1:], required_meld_size) is None:
             raise RummyGameError(
                 f"Kartu buangan hanya boleh diambil jika bisa membentuk meld bukti {required_meld_size} kartu "
@@ -142,6 +151,7 @@ class RummyGame:
         player.had_opened_meld_before_turn = bool(player.opened_melds)
         original_hand = tuple(player.hand)
         del self.discard_pile[-depth:]
+        del self.discarded_by_user_ids[-depth:]
         player.hand.extend(picked_cards)
         player.hand = self._sort_cards(player.hand)
         self.awaiting_discard_user_id = user_id
@@ -151,9 +161,9 @@ class RummyGame:
         self.required_discard_meld_size = required_meld_size
         return RummyActionResult(
             [
-                f"{player.name} mengambil {depth} kartu dari buangan dengan target {target_card.label}.",
+                f"{player.name} mengambil {depth} kartu dari buangan dengan target {target_card.activity_label}.",
                 f"{player.name} wajib menurunkan meld bukti {required_meld_size} kartu yang memakai "
-                f"{target_card.label} sebelum membuang kartu.",
+                f"{target_card.activity_label} sebelum membuang kartu.",
             ]
         )
 
@@ -184,7 +194,7 @@ class RummyGame:
         for card in meld:
             player.hand.remove(card)
         player.opened_melds.append(tuple(meld))
-        meld_text = ", ".join(card.label for card in meld)
+        meld_text = ", ".join(card.activity_label for card in meld)
         if required_card is not None:
             self.required_discard_meld_card = None
             self.required_discard_meld_hand_cards = ()
@@ -225,7 +235,7 @@ class RummyGame:
         for card in selected_cards:
             player.hand.remove(card)
         target_player.opened_melds[meld_index] = tuple(combined_meld)
-        cards_text = ", ".join(card.label for card in selected_cards)
+        cards_text = ", ".join(card.activity_label for card in selected_cards)
         messages = [f"{player.name} menggabungkan {cards_text} ke meld terbuka {target_player.name}."]
         if not player.hand:
             return self._complete_empty_hand_turn(
@@ -252,6 +262,7 @@ class RummyGame:
 
         player.hand = remaining
         self.discard_pile.append(card)
+        self.discarded_by_user_ids.append(user_id)
         self.awaiting_discard_user_id = None
         source = self.last_draw_source
         self.last_draw_source = None
@@ -261,22 +272,22 @@ class RummyGame:
             self.closed_card = card
             bonus = closed_card_bonus(card) if source == "deck" else 0
             return self._finish(
-                f"{player.name} closed card dengan {card.label} dan mendapat bonus {bonus} poin.",
+                f"{player.name} closed card dengan {card.activity_label} dan mendapat bonus {bonus} poin.",
                 bonus,
                 go_rummy=not player.had_opened_meld_before_turn,
             )
         if not player.hand:
             return self._complete_empty_hand_turn(
-                f"{player.name} menghabiskan seluruh kartu dengan membuang {card.label}.",
+                f"{player.name} menghabiskan seluruh kartu dengan membuang {card.activity_label}.",
                 go_rummy=not player.had_opened_meld_before_turn,
             )
         if not self.deck:
-            return self._finish(f"{player.name} membuang {card.label}. Deck habis. Perhitungan skor dimulai.")
+            return self._finish(f"{player.name} membuang {card.activity_label}. Deck habis. Perhitungan skor dimulai.")
 
         next_player = self._advance_to_next_player_with_cards()
         return RummyActionResult(
             [
-                f"{player.name} membuang {card.label} setelah mengambil dari {source}.",
+                f"{player.name} membuang {card.activity_label} setelah mengambil dari {source}.",
                 f"Giliran berikutnya: {next_player.name}.",
             ]
         )
@@ -294,6 +305,7 @@ class RummyGame:
             "deck_count": len(self.deck),
             "top_discard": self.discard_pile[-1].label if self.discard_pile else "Belum ada",
             "visible_discards": [card.label for card in self.visible_discards()],
+            "visible_discard_user_ids": [user_id for _card, user_id in self.visible_discard_details()],
             "discard_count": len(self.discard_pile),
             "hand_counts": [(player.user_id, player.name, len(player.hand)) for player in self.players],
             "opened_melds": [
@@ -301,6 +313,7 @@ class RummyGame:
                 for player in self.players
             ],
             "scores": dict(self.scores),
+            "score_breakdowns": {user_id: dict(details) for user_id, details in self.score_breakdowns.items()},
             "closed_user_id": self.closed_user_id,
             "closed_card": self.closed_card.label if self.closed_card else None,
             "go_rummy_user_id": self.go_rummy_user_id,
@@ -313,17 +326,29 @@ class RummyGame:
         self.required_discard_meld_card = None
         self.required_discard_meld_hand_cards = ()
         self.required_discard_meld_size = None
-        self.scores = {
-            player.user_id: score_hand(player.hand) + sum(card.point_value for meld in player.opened_melds for card in meld)
-            for player in self.players
-        }
-        if self.closed_user_id is not None:
-            self.scores[self.closed_user_id] += closed_bonus
+        self.score_breakdowns = {}
+        for player in self.players:
+            hand_meld_points, deadwood_points = score_hand_breakdown(player.hand)
+            opened_meld_points = sum(card.point_value for meld in player.opened_melds for card in meld)
+            player_closed_bonus = closed_bonus if player.user_id == self.closed_user_id else 0
+            subtotal = opened_meld_points + hand_meld_points - deadwood_points + player_closed_bonus
+            self.score_breakdowns[player.user_id] = {
+                "opened_meld_points": opened_meld_points,
+                "hand_meld_points": hand_meld_points,
+                "deadwood_points": deadwood_points,
+                "closed_bonus": player_closed_bonus,
+                "subtotal": subtotal,
+                "go_rummy_multiplier": 1,
+                "total": subtotal,
+            }
         if go_rummy:
             self.go_rummy_user_id = self.closed_user_id or next((player.user_id for player in self.players if not player.hand), None)
         if self.go_rummy_user_id is not None:
-            self.scores = {user_id: score * 2 for user_id, score in self.scores.items()}
+            for details in self.score_breakdowns.values():
+                details["go_rummy_multiplier"] = 2
+                details["total"] = details["subtotal"] * 2
             message += " Go Rummy aktif: seluruh poin ronde dikalikan 2."
+        self.scores = {user_id: details["total"] for user_id, details in self.score_breakdowns.items()}
         score_text = ", ".join(f"{player.name} {self.scores[player.user_id]:+d}" for player in self.players)
         return RummyActionResult([message, f"Skor ronde: {score_text}."], dict(self.scores), self.closed_user_id)
 
@@ -451,6 +476,11 @@ def can_partition_into_melds(cards: list[RummyCard]) -> bool:
 
 
 def score_hand(cards: list[RummyCard]) -> int:
+    meld_points, deadwood_points = score_hand_breakdown(cards)
+    return meld_points - deadwood_points
+
+
+def score_hand_breakdown(cards: list[RummyCard]) -> tuple[int, int]:
     @lru_cache(maxsize=None)
     def best_meld_points(remaining: tuple[RummyCard, ...]) -> int:
         best = 0
@@ -466,7 +496,7 @@ def score_hand(cards: list[RummyCard]) -> int:
 
     total = sum(card.point_value for card in cards)
     meld_points = best_meld_points(tuple(cards))
-    return meld_points - (total - meld_points)
+    return meld_points, total - meld_points
 
 
 def closed_card_bonus(card: RummyCard) -> int:

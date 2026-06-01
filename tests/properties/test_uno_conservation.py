@@ -27,6 +27,8 @@ def test_total_card_count_stays_constant(actions: list[bool]) -> None:
         if prefer_play and playable:
             card_index = playable[0]
             card = player.hand[card_index]
+            if len(player.hand) == 1 and player.user_id in game.pending_uno_user_ids:
+                game.call_uno(player.user_id)
             game.play_card(player.user_id, card_index + 1, "red" if card.is_wild else None)
         else:
             game.draw_card(player.user_id)

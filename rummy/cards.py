@@ -20,6 +20,12 @@ SUIT_LABELS = {
     "hearts": "Hearts",
     "spades": "Spades",
 }
+SUIT_EMOJIS = {
+    "diamonds": "♦️",
+    "clubs": "♣️",
+    "hearts": "♥️",
+    "spades": "♠️",
+}
 RANK_LABELS = {"J": "Jack", "Q": "Queen", "K": "King", "A": "Ace"}
 
 
@@ -67,3 +73,9 @@ class RummyCard:
         if self.is_joker:
             return f"Joker {self.joker_color.title()}"
         return f"{RANK_LABELS.get(self.rank, self.rank)} of {SUIT_LABELS[self.suit]}"
+
+    @property
+    def activity_label(self) -> str:
+        if self.is_joker:
+            return f"Joker {self.joker_color.title()}"
+        return f"{self.rank} {SUIT_EMOJIS[self.suit]}"
