@@ -40,9 +40,9 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 - Joker boleh menggantikan kartu dalam meld.
 - Joker tidak boleh dibuang sebagai discard biasa.
 - Joker boleh dipakai sebagai closed card.
-- Closed card valid jika seluruh kartu yang tersisa di tangan dapat dipartisi menjadi meld.
+- Kartu terakhir boleh langsung dipakai sebagai closed card. Jika masih ada kartu lain, seluruh kartu yang tersisa di tangan wajib dapat dipartisi menjadi meld.
 - Menghabiskan kartu melalui meld atau discard biasa tidak langsung menutup ronde. Pemain tanpa kartu dilewati dan ronde berlanjut sampai deck habis atau ada pemain yang melakukan closed card.
-- Bonus closed card hanya diberikan jika draw terakhir berasal dari deck, sesuai brief awal.
+- Jika kartu buangan dijadikan target meld bukti, pemain yang membuang kartu terkena penalti flip card sesuai jenis kartu tersebut.
 - Run memakai rank `2, 3, ..., 10, J, Q, K, A`; Ace tinggi dan tidak wrap.
 - Go Rummy terjadi jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut. Seluruh poin ronde dikalikan 2.
 
@@ -96,15 +96,15 @@ Saat ronde selesai:
 - Kartu yang masuk meld bernilai positif.
 - Kartu tersisa atau deadwood bernilai negatif.
 - Engine mencari kombinasi meld terbaik secara otomatis.
-- Panel hasil akhir menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, subtotal, dan multiplier Go Rummy.
+- Panel hasil akhir menampilkan rincian meld terbuka, meld tangan, deadwood, penalti flip card, subtotal, dan multiplier Go Rummy.
 
-Bonus closed card setelah draw dari deck:
+Penalti flip card untuk pemain yang kartu buangannya dijadikan target meld bukti:
 
 ```text
-angka biasa = +50
-J/Q/K       = +100
-Ace         = +150
-Joker       = +250
+angka biasa = -50
+J/Q/K       = -100
+Ace         = -150
+Joker       = -250
 ```
 
 ## Regular dan Tournament
@@ -197,7 +197,7 @@ Coverage otomatis:
 - Validasi ambil discard yang langsung membentuk meld.
 - Validasi meld bukti terkunci, pembatasan top-3 discard, discard Ace, dan Go Rummy.
 - Joker ditolak sebagai discard biasa tetapi diterima sebagai closed card.
-- Scoring meld, deadwood, dan bonus closed card.
+- Scoring meld, deadwood, dan penalti flip card.
 - Akumulasi skor tournament.
 - Renderer hand Rummy mendukung joker.
 - Import contract modul Rummy.

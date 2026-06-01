@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.10",
+        "title": "Closed card terakhir dan penalti flip Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mengizinkan kartu terakhir dipakai sebagai closed card untuk langsung menutup ronde.",
+            "Mengganti bonus closed card menjadi penalti flip bagi pemain yang kartu buangannya dijadikan target meld bukti.",
+            "Menampilkan kartu penalti flip pada meja dan rincian pengurangannya pada skor akhir.",
+        ],
+    },
+    {
         "version": "1.1.9",
         "title": "Emoji suit dan meld joker panjang Rummy",
         "date": "2026-06-01",

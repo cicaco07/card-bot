@@ -12,7 +12,7 @@ from rummy.game import (
     RummyPlayer,
     RummyStatus,
     can_partition_into_melds,
-    closed_card_bonus,
+    flip_card_penalty,
     is_valid_meld,
     score_hand,
     score_hand_breakdown,
@@ -69,13 +69,16 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
     ]
     assert game.discard_pile == []
     assert game.discarded_by_user_ids == []
+    assert game.flipped_cards_by_user_id == {}
     assert game.players[0].hand == cards(("9", "clubs"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"))
     assert game.players[0].opened_melds == []
     with pytest.raises(RummyGameError, match="Turunkan meld bukti"):
         game.discard_card(1, 1)
     assert game.lay_down_meld(1, [2, 3, 4]).public_messages == [
-        "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️."
+        "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️.",
+        "Bob mendapat penalti flip card -50 poin karena 4 ♥️ dijadikan meld bukti.",
     ]
+    assert game.flipped_cards_by_user_id == {2: [RummyCard("4", "hearts")]}
     assert game.players[0].hand == cards(("9", "clubs"))
     assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
     assert game.required_discard_meld_card is None
@@ -211,7 +214,7 @@ def test_draw_deck_then_discard_preserves_cards_and_advances_turn() -> None:
     assert len(game.deck) + sum(len(player.hand) for player in game.players) + len(game.discard_pile) == 56
 
 
-def test_regular_discard_rejects_joker_but_close_allows_it() -> None:
+def test_regular_discard_rejects_joker_but_close_allows_it_without_bonus() -> None:
     joker = RummyCard("JOKER", joker_color="red")
     game = RummyGame()
     game.status = RummyStatus.PLAYING
@@ -225,29 +228,57 @@ def test_regular_discard_rejects_joker_but_close_allows_it() -> None:
         game.discard_card(1, 4)
     result = game.discard_card(1, 4, close=True)
     assert result.closed_user_id == 1
-    assert result.scores[1] == 530
+    assert result.scores[1] == 30
     assert result.scores[2] == -10
     assert game.score_breakdowns == {
         1: {
             "opened_meld_points": 0,
             "hand_meld_points": 15,
             "deadwood_points": 0,
-            "closed_bonus": 250,
-            "subtotal": 265,
+            "flip_penalty_points": 0,
+            "subtotal": 15,
             "go_rummy_multiplier": 2,
-            "total": 530,
+            "total": 30,
         },
         2: {
             "opened_meld_points": 0,
             "hand_meld_points": 0,
             "deadwood_points": 5,
-            "closed_bonus": 0,
+            "flip_penalty_points": 0,
             "subtotal": -5,
             "go_rummy_multiplier": 2,
             "total": -10,
         },
     }
     assert game.go_rummy_user_id == 1
+
+
+def test_closed_card_accepts_last_card_and_applies_flip_penalty_to_discarder() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("2", "spades"))), RummyPlayer(2, "Bob", cards(("9", "clubs")))]
+    game.deck = cards(("K", "spades"))
+    game.awaiting_discard_user_id = 1
+    game.last_draw_source = "deck"
+    game.flipped_cards_by_user_id = {2: cards(("4", "hearts"))}
+
+    result = game.discard_card(1, 1, close=True)
+
+    assert result.public_messages == [
+        "Alice closed card dengan 2 ♠️. Go Rummy aktif: seluruh poin ronde dikalikan 2.",
+        "Skor ronde: Alice +0, Bob -110.",
+    ]
+    assert result.closed_user_id == 1
+    assert game.status == RummyStatus.FINISHED
+    assert game.score_breakdowns[2] == {
+        "opened_meld_points": 0,
+        "hand_meld_points": 0,
+        "deadwood_points": 5,
+        "flip_penalty_points": 50,
+        "subtotal": -55,
+        "go_rummy_multiplier": 2,
+        "total": -110,
+    }
 
 
 def test_ace_discard_requires_opened_meld() -> None:
@@ -292,14 +323,14 @@ def test_lay_off_cards_extends_opened_meld() -> None:
     assert game.players[1].opened_melds == [tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
 
 
-def test_score_and_closed_bonus_rules() -> None:
+def test_score_and_flip_card_penalty_rules() -> None:
     hand = cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("A", "clubs"))
     assert score_hand(hand) == 0
     assert score_hand_breakdown(hand) == (15, 15)
-    assert closed_card_bonus(RummyCard("9", "clubs")) == 50
-    assert closed_card_bonus(RummyCard("K", "clubs")) == 100
-    assert closed_card_bonus(RummyCard("A", "clubs")) == 150
-    assert closed_card_bonus(RummyCard("JOKER", joker_color="black")) == 250
+    assert flip_card_penalty(RummyCard("9", "clubs")) == 50
+    assert flip_card_penalty(RummyCard("K", "clubs")) == 100
+    assert flip_card_penalty(RummyCard("A", "clubs")) == 150
+    assert flip_card_penalty(RummyCard("JOKER", joker_color="black")) == 250
 
 
 def test_tournament_accumulates_round_scores() -> None:

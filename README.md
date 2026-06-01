@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.9`
+Versi saat ini: `1.1.10`
 
 Command changelog:
 
@@ -293,12 +293,12 @@ Rules utama:
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
 - Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
 - Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
-- Tombol **Closed Card** mengakhiri ronde jika seluruh kartu tersisa sudah menjadi meld.
+- Tombol **Closed Card** mengakhiri ronde. Kartu terakhir boleh langsung dipakai sebagai closed card; jika masih ada kartu lain, semuanya wajib dapat menjadi meld.
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
-- Hasil akhir ronde menampilkan rincian meld terbuka, meld tangan, deadwood, bonus closed card, dan multiplier Go Rummy.
+- Jika kartu buangan dijadikan target meld bukti, pemain yang membuang kartu terkena penalti flip card: angka -50, J/Q/K -100, Ace -150, joker -250.
+- Hasil akhir ronde menampilkan rincian meld terbuka, meld tangan, deadwood, penalti flip card, dan multiplier Go Rummy.
 - Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
-- Bonus closed card setelah draw deck: angka +50, J/Q/K +100, Ace +150, joker +250.
 - Go Rummy menggandakan seluruh poin ronde jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut.
 - Mode tournament mengakumulasi skor selama 3-20 ronde.
 

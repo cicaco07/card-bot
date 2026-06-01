@@ -47,6 +47,7 @@ def rummy_state_text(session: RummySession) -> str:
         for user_id, _name, melds in state["opened_melds"]
         if melds
     ) or "- Belum ada meld yang diturunkan."
+    flipped_cards = _flipped_cards_text(state["flipped_cards"])
     actions = "\n".join(f"- {message}" for message in session.log[:4]) or "- Belum ada aksi."
     tournament = (
         f"Mode: **Tournament ronde {session.tournament_current_round}/{session.tournament_total_rounds}**\n"
@@ -70,6 +71,7 @@ def rummy_state_text(session: RummySession) -> str:
         f"Total buangan: {state['discard_count']}\n"
         f"3 buangan teratas:\n{visible_discards}\n\n"
         f"Meld terbuka dan terkunci:\n{opened_melds}\n\n"
+        f"Penalti flip card:\n{flipped_cards}\n\n"
         f"Jumlah kartu pemain:\n{hands}\n\n"
         f"Vote akhiri game: **{session.end_vote_count}/{session.end_vote_required} setuju**\n\n"
         f"Aksi terakhir:\n{actions}{scores}"
@@ -88,7 +90,8 @@ def rummy_finished_text(session: RummySession) -> str:
     else:
         footer = "Tekan **Buat Lobby Baru** untuk main lagi."
     tournament = f"\n\n{rummy_scoreboard_text(session)}" if session.is_tournament else ""
-    return f"**Rummy: Selesai**\n\nSkor ronde:\n{scores}{tournament}\n\nLog akhir:\n{log}\n\n{footer}"
+    flipped_cards = _flipped_cards_text(state["flipped_cards"])
+    return f"**Rummy: Selesai**\n\nSkor ronde:\n{scores}{tournament}\n\nPenalti flip card:\n{flipped_cards}\n\nLog akhir:\n{log}\n\n{footer}"
 
 
 def _finished_score_text(user_id: int, score: int, details: dict[str, int] | None) -> str:
@@ -99,7 +102,7 @@ def _finished_score_text(user_id: int, score: int, details: dict[str, int] | Non
         f"meld terbuka {details['opened_meld_points']:+d}, "
         f"meld tangan {details['hand_meld_points']:+d}, "
         f"deadwood {-details['deadwood_points']:+d}, "
-        f"bonus closed {details['closed_bonus']:+d} = subtotal {details['subtotal']:+d}"
+        f"penalti flip {-details['flip_penalty_points']:+d} = subtotal {details['subtotal']:+d}"
     )
     if details["go_rummy_multiplier"] > 1:
         calculation += f", Go Rummy x{details['go_rummy_multiplier']} = total {details['total']:+d}"
@@ -125,7 +128,8 @@ def rummy_rules_embed() -> discord.Embed:
     embed.add_field(name="Meld", value="Run: minimal 3 kartu berurutan dengan suit sama. Set: minimal 3 kartu rank sama. Joker boleh menggantikan kartu apa pun. Meld yang sudah dibuka bisa ditambah lewat Gabungkan Meld jika hasilnya tetap valid.", inline=False)
     embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
     embed.add_field(name="Discard Ace", value="Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.", inline=False)
-    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Go Rummy menggandakan seluruh poin ronde.", inline=False)
+    embed.add_field(name="Closed Card", value="Kartu terakhir boleh dipakai sebagai closed card untuk langsung mengakhiri ronde. Jika masih ada kartu lain, semuanya wajib sudah dapat menjadi meld.", inline=False)
+    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Jika kartu buangan dijadikan target meld bukti, pembuangnya terkena penalti flip: angka -50, J/Q/K -100, Ace -150, joker -250. Go Rummy menggandakan seluruh poin ronde.", inline=False)
     return embed
 
 
@@ -147,6 +151,10 @@ def rummy_table_visuals(session: RummySession) -> tuple[discord.Embed | None, li
 
 def _discarded_by_text(user_id: int | None) -> str:
     return f" - dibuang oleh {mention(user_id)}" if user_id is not None else ""
+
+
+def _flipped_cards_text(flipped_cards: list[tuple[int, list[str]]]) -> str:
+    return "\n".join(f"- {mention(user_id)}: {', '.join(cards)}" for user_id, cards in flipped_cards) or "- Belum ada penalti."
 
 
 def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_numbers: set[int] | None = None) -> str:

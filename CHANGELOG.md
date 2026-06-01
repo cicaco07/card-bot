@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.10 - 2026-06-01
+
+Closed card terakhir dan penalti flip Rummy.
+
+- Mengizinkan kartu terakhir dipakai sebagai closed card untuk langsung menutup ronde.
+- Mengganti bonus closed card menjadi penalti flip bagi pemain yang kartu buangannya dijadikan target meld bukti.
+- Menampilkan kartu penalti flip pada meja dan rincian pengurangannya pada skor akhir.
+
 ## 1.1.9 - 2026-06-01
 
 Emoji suit dan meld joker panjang Rummy.
