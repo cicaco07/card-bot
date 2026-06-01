@@ -6,6 +6,13 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.8 - 2026-06-01
+
+Koreksi meld bukti ambil tiga buangan Rummy.
+
+- Mengubah meld bukti saat mengambil 3 kartu buangan menjadi tepat 3 kartu bersama minimal 2 kartu tangan sebelumnya.
+- Membebaskan dua kartu di atas target untuk disimpan atau dibuang kembali.
+
 ## 1.1.7 - 2026-06-01
 
 Publikasi changelog berurutan.

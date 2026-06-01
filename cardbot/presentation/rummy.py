@@ -123,7 +123,7 @@ def rummy_rules_embed() -> discord.Embed:
     embed.add_field(name="Setup", value="2-4 pemain. Setiap pemain mendapat 7 kartu. Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.", inline=False)
     embed.add_field(name="Giliran", value="Ambil satu kartu dari deck atau buangan, lalu wajib buang satu kartu non-joker.", inline=False)
     embed.add_field(name="Meld", value="Run: minimal 3 kartu berurutan dengan suit sama. Set: minimal 3 kartu rank sama. Joker boleh menggantikan kartu apa pun. Meld yang sudah dibuka bisa ditambah lewat Gabungkan Meld jika hasilnya tetap valid.", inline=False)
-    embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Ambil 1-2 wajib meld bukti 3 kartu; ambil 3 wajib meld bukti 4 kartu. Kartu target wajib dipakai, sedangkan kartu di atasnya bebas disimpan atau dibuang lagi.", inline=False)
+    embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
     embed.add_field(name="Discard Ace", value="Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.", inline=False)
     embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Go Rummy menggandakan seluruh poin ronde.", inline=False)
     return embed

@@ -87,11 +87,23 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
 
     game = RummyGame()
     game.status = RummyStatus.PLAYING
-    game.players = [RummyPlayer(1, "Alice", cards(("2", "hearts"), ("3", "hearts"))), RummyPlayer(2, "Bob")]
-    game.discard_pile = cards(("4", "hearts"), ("5", "hearts"), ("6", "hearts"))
-    game.draw_from_discard(1, 3)
-    with pytest.raises(RummyGameError, match="minimal 2 kartu dari tangan sebelumnya"):
-        game.lay_down_meld(1, [2, 3, 4, 5])
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"), ("9", "clubs"), ("K", "spades"))
+    assert game.draw_from_discard(1, 3).public_messages == [
+        "Alice mengambil 3 kartu dari buangan dengan target 4 ♥️.",
+        "Alice wajib menurunkan meld bukti 3 kartu yang memakai 4 ♥️ sebelum membuang kartu.",
+    ]
+    assert game.lay_down_meld(1, [2, 3, 4]).public_messages == [
+        "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️."
+    ]
+    assert game.players[0].hand == cards(("9", "clubs"), ("K", "spades"))
+
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("2", "hearts"), ("8", "clubs"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"), ("3", "hearts"), ("5", "hearts"))
+    with pytest.raises(RummyGameError, match="minimal 2 kartu dari tangan"):
+        game.draw_from_discard(1, 3)
 
     game = RummyGame()
     game.status = RummyStatus.PLAYING

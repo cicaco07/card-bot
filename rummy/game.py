@@ -142,7 +142,7 @@ class RummyGame:
         player = self.current_player
         target_card = discards[depth - 1]
         picked_cards = self.discard_pile[-depth:]
-        required_meld_size = 4 if depth == 3 else 3
+        required_meld_size = 3
         if self._discard_draw_meld(player.hand, target_card, picked_cards[1:], required_meld_size) is None:
             raise RummyGameError(
                 f"Kartu buangan hanya boleh diambil jika bisa membentuk meld bukti {required_meld_size} kartu "

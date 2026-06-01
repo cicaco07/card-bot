@@ -168,7 +168,7 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-2 wajib meld bukti 3 kartu; ambil 3 wajib meld bukti 4 kartu. Kartu target wajib dipakai, sedangkan kartu di atasnya bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 

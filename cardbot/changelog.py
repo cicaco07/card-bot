@@ -7,6 +7,15 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.8",
+        "title": "Koreksi meld bukti ambil tiga buangan Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mengubah meld bukti saat mengambil 3 kartu buangan menjadi tepat 3 kartu bersama minimal 2 kartu tangan sebelumnya.",
+            "Membebaskan dua kartu di atas target untuk disimpan atau dibuang kembali.",
+        ],
+    },
+    {
         "version": "1.1.7",
         "title": "Publikasi changelog berurutan",
         "date": "2026-06-01",
