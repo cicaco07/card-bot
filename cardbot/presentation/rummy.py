@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import discord
 
-from rummy.assets import render_discard_image, render_rummy_hand_image
+from rummy.assets import render_discard_pile_image, render_rummy_hand_image
 from rummy.game import RummyGame, RummyStatus
 
 from ..sessions import RummySession
@@ -38,6 +38,12 @@ def rummy_lobby_text(session: RummySession) -> str:
 def rummy_state_text(session: RummySession) -> str:
     state = session.game.public_state()
     hands = "\n".join(f"- {mention(user_id)}: {count} kartu" for user_id, _name, count in state["hand_counts"])
+    visible_discards = "\n".join(f"- {index}. {label}" for index, label in enumerate(state["visible_discards"], 1)) or "- Belum ada"
+    opened_melds = "\n".join(
+        f"- {mention(user_id)}: {', '.join('[' + ', '.join(meld) + ']' for meld in melds)}"
+        for user_id, _name, melds in state["opened_melds"]
+        if melds
+    ) or "- Belum ada meld yang diturunkan."
     actions = "\n".join(f"- {message}" for message in session.log[:4]) or "- Belum ada aksi."
     tournament = (
         f"Mode: **Tournament ronde {session.tournament_current_round}/{session.tournament_total_rounds}**\n"
@@ -51,7 +57,9 @@ def rummy_state_text(session: RummySession) -> str:
         f"Fase giliran: **{state['phase']}**\n"
         f"Sisa deck: **{state['deck_count']} kartu**\n"
         f"Kartu buangan teratas: **{state['top_discard']}**\n"
-        f"Total buangan: {state['discard_count']}\n\n"
+        f"Total buangan: {state['discard_count']}\n"
+        f"3 buangan teratas:\n{visible_discards}\n\n"
+        f"Meld terbuka dan terkunci:\n{opened_melds}\n\n"
         f"Jumlah kartu pemain:\n{hands}\n\n"
         f"Vote akhiri game: **{session.end_vote_count}/{session.end_vote_required} setuju**\n\n"
         f"Aksi terakhir:\n{actions}{scores}"
@@ -87,11 +95,12 @@ def rummy_rules_embed() -> discord.Embed:
         description="Buat kombinasi meld dan tutup ronde dengan closed card.",
         color=discord.Color.dark_teal(),
     )
-    embed.add_field(name="Setup", value="2-4 pemain. Setiap pemain mendapat 7 kartu. Deck memakai 52 kartu standar dan 2 joker.", inline=False)
+    embed.add_field(name="Setup", value="2-4 pemain. Setiap pemain mendapat 7 kartu. Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.", inline=False)
     embed.add_field(name="Giliran", value="Ambil satu kartu dari deck atau buangan, lalu wajib buang satu kartu non-joker.", inline=False)
-    embed.add_field(name="Meld", value="Run: minimal 3 kartu berurutan dengan suit sama. Set: minimal 3 kartu rank sama. Joker boleh menggantikan kartu apa pun.", inline=False)
-    embed.add_field(name="Ambil Buangan", value="Boleh memilih salah satu dari maksimal 7 kartu buangan teratas jika kartu itu langsung melengkapi meld dari minimal 2 kartu tangan.", inline=False)
-    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Closed card memberi bonus +50/+100/+150.", inline=False)
+    embed.add_field(name="Meld", value="Run: minimal 3 kartu berurutan dengan suit sama. Set: minimal 3 kartu rank sama. Joker boleh menggantikan kartu apa pun. Meld yang sudah dibuka bisa ditambah lewat Gabungkan Meld jika hasilnya tetap valid.", inline=False)
+    embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Kartu target wajib langsung menjadi meld bukti, dibuka ke semua pemain, dan dikunci.", inline=False)
+    embed.add_field(name="Discard Ace", value="Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.", inline=False)
+    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Go Rummy menggandakan seluruh poin ronde.", inline=False)
     return embed
 
 
@@ -100,21 +109,22 @@ def rummy_table_visuals(session: RummySession) -> tuple[discord.Embed | None, li
         return rummy_rules_embed(), []
     if not session.game.discard_pile:
         return None, []
-    buffer, filename = render_discard_image(session.game.discard_pile[-1])
+    buffer, filename = render_discard_pile_image(session.game.visible_discards())
     file = discord.File(buffer, filename=filename)
-    embed = discord.Embed(title="Buangan Teratas", description=session.game.discard_pile[-1].label)
+    labels = "\n".join(f"{index}. {card.label}" for index, card in enumerate(session.game.visible_discards(), 1))
+    embed = discord.Embed(title="3 Buangan Teratas", description=labels)
     embed.set_image(url=f"attachment://{filename}")
     return embed, [file]
 
 
-def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_number: int | None = None) -> str:
+def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_numbers: set[int] | None = None) -> str:
     total_pages = max(1, (len(game.hand_for(user_id)) + page_size - 1) // page_size)
-    selected = str(selected_number) if selected_number is not None else "belum ada"
-    return f"**Kartu Rummy Tanganmu**\nHalaman {page + 1}/{total_pages}. Pilih kartu untuk dibuang.\nPilihan saat ini: {selected}"
+    selected = ", ".join(str(number) for number in sorted(selected_numbers or set())) or "belum ada"
+    return f"**Kartu Rummy Tanganmu**\nHalaman {page + 1}/{total_pages}. Pilih 1 kartu untuk dibuang atau minimal 3 kartu untuk diturunkan sebagai meld.\nPilihan saat ini: {selected}"
 
 
-def rummy_hand_visuals(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_number: int | None = None) -> tuple[discord.Embed, list[discord.File]]:
-    buffer, filename = render_rummy_hand_image(game.hand_for(user_id), page, selected_number, page_size)
+def rummy_hand_visuals(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_numbers: set[int] | None = None) -> tuple[discord.Embed, list[discord.File]]:
+    buffer, filename = render_rummy_hand_image(game.hand_for(user_id), page, selected_numbers, page_size)
     file = discord.File(buffer, filename=filename)
     embed = discord.Embed(title="Kartu Rummy")
     embed.set_image(url=f"attachment://{filename}")

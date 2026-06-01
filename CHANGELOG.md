@@ -6,6 +6,17 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.1 - 2026-06-01
+
+Penyempurnaan rules Rummy.
+
+- Membatasi pengambilan kartu buangan menjadi maksimal 3 kartu teratas.
+- Mewajibkan kartu target dari buangan langsung menjadi meld bukti publik yang terkunci.
+- Menampilkan 3 kartu buangan teratas dan meld terbuka kepada seluruh pemain.
+- Menambahkan tombol **Turunkan Meld** dan **Gabungkan Meld** serta larangan membuang Ace sebelum pemain membuka minimal satu meld.
+- Menambah joker Rummy menjadi 4 kartu: 2 joker merah dan 2 joker hitam tanpa mengubah deck standar.
+- Menambahkan rule Go Rummy yang menggandakan seluruh poin ronde.
+
 ## 1.1.0 - 2026-05-31
 
 Mode Rummy regular dan tournament.

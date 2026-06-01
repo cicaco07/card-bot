@@ -148,8 +148,9 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             session.game.hand_for(interaction.user.id)
+            await interaction.response.defer(ephemeral=True, thinking=True)
             embed, files = await asyncio.to_thread(rummy_hand_visuals, session.game, interaction.user.id)
-            await interaction.response.send_message(rummy_hand_text(session.game, interaction.user.id), embed=embed, files=files, view=RummyHandView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.followup.send(rummy_hand_text(session.game, interaction.user.id), embed=embed, files=files, view=RummyHandView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 
@@ -167,7 +168,7 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            await interaction.response.send_message("Pilih salah satu dari maksimal 7 kartu buangan teratas:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Target wajib langsung menjadi meld bukti:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 
@@ -216,38 +217,45 @@ class RummyDiscardView(discord.ui.View):
 
 
 class RummyHandSelect(discord.ui.Select):
-    def __init__(self, channel_id: int, user_id: int, selected_number: int | None = None) -> None:
+    def __init__(self, channel_id: int, user_id: int, selected_numbers: set[int]) -> None:
         self.channel_id, self.user_id = channel_id, user_id
         cards = get_rummy_session(channel_id).game.hand_for(user_id)
-        super().__init__(placeholder="Pilih kartu untuk dibuang", options=[
-            discord.SelectOption(label=f"{index}. {card.label}"[:100], value=str(index), default=index == selected_number)
-            for index, card in enumerate(cards, 1)
-        ])
+        options = [
+            discord.SelectOption(label=f"{index}. {card.label}"[:100], value=str(index), default=index in selected_numbers)
+            for index, card in enumerate(cards[:25], 1)
+        ]
+        if not options:
+            options = [discord.SelectOption(label="Tidak ada kartu", value="empty")]
+        super().__init__(placeholder="Pilih kartu buang atau meld", min_values=1, max_values=len(options), options=options)
 
     async def callback(self, interaction: discord.Interaction) -> None:
         try:
             if interaction.user.id != self.user_id:
                 raise RummyGameError("Ini panel kartu pemain lain.")
+            if self.values[0] == "empty":
+                raise RummyGameError("Tidak ada kartu yang bisa dipilih.")
             session = get_rummy_session(self.channel_id)
-            selected = int(self.values[0])
+            selected = {int(value) for value in self.values}
+            await interaction.response.defer()
             embed, files = await asyncio.to_thread(rummy_hand_visuals, session.game, self.user_id, 0, 25, selected)
-            await interaction.response.edit_message(content=rummy_hand_text(session.game, self.user_id, selected_number=selected), embed=embed, attachments=files, view=RummyHandView(self.channel_id, self.user_id, selected))
+            await interaction.edit_original_response(content=rummy_hand_text(session.game, self.user_id, selected_numbers=selected), embed=embed, attachments=files, view=RummyHandView(self.channel_id, self.user_id, selected))
         except RummyGameError as error:
             await reply_error(interaction, error)
 
 
 class RummyHandView(discord.ui.View):
-    def __init__(self, channel_id: int, user_id: int, selected_number: int | None = None) -> None:
+    def __init__(self, channel_id: int, user_id: int, selected_numbers: set[int] | None = None) -> None:
         super().__init__(timeout=180)
-        self.channel_id, self.user_id, self.selected_number = channel_id, user_id, selected_number
-        self.add_item(RummyHandSelect(channel_id, user_id, selected_number))
+        self.channel_id, self.user_id = channel_id, user_id
+        self.selected_numbers = selected_numbers or set()
+        self.add_item(RummyHandSelect(channel_id, user_id, self.selected_numbers))
 
     async def _discard(self, interaction: discord.Interaction, close: bool) -> None:
         try:
-            if interaction.user.id != self.user_id or self.selected_number is None:
-                raise RummyGameError("Pilih kartu terlebih dahulu.")
+            if interaction.user.id != self.user_id or len(self.selected_numbers) != 1:
+                raise RummyGameError("Pilih tepat 1 kartu untuk dibuang.")
             session = get_rummy_session(self.channel_id)
-            result = session.game.discard_card(self.user_id, self.selected_number, close)
+            result = session.game.discard_card(self.user_id, next(iter(self.selected_numbers)), close)
             add_action_log(session, result.public_messages)
             await interaction.response.edit_message(content="\n".join(result.public_messages), embed=None, attachments=[], view=None)
             await refresh_rummy_table_message(session)
@@ -261,6 +269,73 @@ class RummyHandView(discord.ui.View):
     @discord.ui.button(label="Closed Card", style=discord.ButtonStyle.success, row=1)
     async def close(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         await self._discard(interaction, True)
+
+    @discord.ui.button(label="Turunkan Meld", style=discord.ButtonStyle.secondary, row=1)
+    async def lay_down_meld(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            if interaction.user.id != self.user_id:
+                raise RummyGameError("Ini panel kartu pemain lain.")
+            session = get_rummy_session(self.channel_id)
+            result = session.game.lay_down_meld(self.user_id, sorted(self.selected_numbers))
+            add_action_log(session, result.public_messages)
+            await interaction.response.edit_message(content="\n".join(result.public_messages), embed=None, attachments=[], view=None)
+            await refresh_rummy_table_message(session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Gabungkan Meld", style=discord.ButtonStyle.secondary, row=2)
+    async def lay_off_cards(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            if interaction.user.id != self.user_id:
+                raise RummyGameError("Ini panel kartu pemain lain.")
+            if not self.selected_numbers:
+                raise RummyGameError("Pilih minimal 1 kartu untuk digabungkan.")
+            session = get_rummy_session(self.channel_id)
+            if not any(player.opened_melds for player in session.game.players):
+                raise RummyGameError("Belum ada meld terbuka yang bisa digabungkan.")
+            await interaction.response.send_message(
+                "Pilih meld terbuka yang akan menerima kartu pilihanmu:",
+                view=RummyLayOffView(self.channel_id, self.user_id, self.selected_numbers),
+                ephemeral=True,
+            )
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+
+class RummyLayOffSelect(discord.ui.Select):
+    def __init__(self, channel_id: int, user_id: int, selected_numbers: set[int]) -> None:
+        self.channel_id, self.user_id, self.selected_numbers = channel_id, user_id, selected_numbers
+        session = get_rummy_session(channel_id)
+        options = []
+        for player in session.game.players:
+            for meld_index, meld in enumerate(player.opened_melds):
+                label = f"{player.name}: {', '.join(card.label for card in meld)}"
+                options.append(discord.SelectOption(label=label[:100], value=f"{player.user_id}:{meld_index}"))
+        super().__init__(placeholder="Pilih meld target", options=options[:25])
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            if interaction.user.id != self.user_id:
+                raise RummyGameError("Ini panel gabungan meld pemain lain.")
+            target_user_id, meld_index = (int(value) for value in self.values[0].split(":"))
+            session = get_rummy_session(self.channel_id)
+            result = session.game.lay_off_cards(
+                self.user_id,
+                target_user_id,
+                meld_index,
+                sorted(self.selected_numbers),
+            )
+            add_action_log(session, result.public_messages)
+            await interaction.response.edit_message(content="\n".join(result.public_messages), view=None)
+            await refresh_rummy_table_message(session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+
+class RummyLayOffView(discord.ui.View):
+    def __init__(self, channel_id: int, user_id: int, selected_numbers: set[int]) -> None:
+        super().__init__(timeout=60)
+        self.add_item(RummyLayOffSelect(channel_id, user_id, selected_numbers))
 
 
 class RummyFinishedView(discord.ui.View):

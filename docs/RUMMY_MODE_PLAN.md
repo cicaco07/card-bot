@@ -6,7 +6,7 @@ Status implementasi: **selesai untuk scope MVP**.
 
 ## Ringkasan Mode
 
-Mode Rummy memakai 52 kartu standar dan 2 joker. Pemain mengambil satu kartu lalu membuang satu kartu pada setiap giliran. Tujuannya adalah membentuk meld, memperoleh skor tertinggi, dan menutup ronde dengan **closed card** jika seluruh kartu selain satu kartu penutup sudah menjadi meld.
+Mode Rummy memakai 52 kartu standar dan 4 joker. Pemain mengambil satu kartu lalu membuang satu kartu pada setiap giliran. Tujuannya adalah membentuk meld, memperoleh skor tertinggi, dan menutup ronde dengan **closed card** jika seluruh kartu selain satu kartu penutup sudah menjadi meld.
 
 Command publik:
 
@@ -28,16 +28,21 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 
 - Pemain: 2-4 orang.
 - Hand awal: 7 kartu per pemain.
-- Deck: 52 kartu standar dan 2 joker.
+- Deck: 52 kartu standar dan 4 joker, terdiri dari 2 joker merah dan 2 joker hitam.
 - Setiap giliran dimulai pada fase draw lalu wajib diakhiri dengan discard.
-- Kartu buangan dapat dipilih dari maksimal 7 kartu teratas.
-- Kartu buangan hanya dapat diambil jika langsung membentuk meld bersama minimal 2 kartu yang sudah ada di tangan.
+- Kartu buangan dapat dipilih dari maksimal 3 kartu teratas.
+- Saat memilih discard lebih dalam, seluruh kartu di atas target ikut diambil ke hand.
+- Kartu target buangan wajib langsung membentuk meld bukti bersama minimal 2 kartu tangan, dibuka ke semua pemain, dan dikunci.
+- Pemain dapat menurunkan meld dari hand. Meld yang sudah terbuka tidak bisa diganti.
+- Pemain dapat menggabungkan kartu ke meld terbuka milik sendiri atau pemain lain jika hasilnya tetap valid.
+- Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
 - Joker boleh menggantikan kartu dalam meld.
 - Joker tidak boleh dibuang sebagai discard biasa.
 - Joker boleh dipakai sebagai closed card.
 - Closed card valid jika seluruh kartu yang tersisa di tangan dapat dipartisi menjadi meld.
 - Bonus closed card hanya diberikan jika draw terakhir berasal dari deck, sesuai brief awal.
 - Run memakai rank `2, 3, ..., 10, J, Q, K, A`; Ace tinggi dan tidak wrap.
+- Go Rummy terjadi jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut. Seluruh poin ronde dikalikan 2.
 
 ## Meld Valid
 
@@ -166,23 +171,28 @@ Panel game:
 - **Ambil Buangan**
 - **Refresh Meja**
 - **Vote End Game**
+- Tiga kartu discard teratas ditampilkan sebagai gambar publik.
+- Meld yang sudah dibuka ditampilkan dan dikunci.
 
 Panel private:
 
 - Gambar hand bernomor.
 - Dropdown kartu yang akan dibuang.
 - Tombol **Buang Kartu**.
+- Tombol **Turunkan Meld**.
+- Tombol **Gabungkan Meld**.
 - Tombol **Closed Card**.
-- Dropdown maksimal 7 kartu buangan teratas.
+- Dropdown maksimal 3 kartu buangan teratas.
 
 ## Test Coverage
 
 Coverage otomatis:
 
-- Deck berisi 54 kartu termasuk 2 joker.
+- Deck berisi 56 kartu termasuk 4 joker.
 - Deal awal 7 kartu.
 - Validasi run, set, joker, dan partisi meld.
 - Validasi ambil discard yang langsung membentuk meld.
+- Validasi meld bukti terkunci, pembatasan top-3 discard, discard Ace, dan Go Rummy.
 - Joker ditolak sebagai discard biasa tetapi diterima sebagai closed card.
 - Scoring meld, deadwood, dan bonus closed card.
 - Akumulasi skor tournament.
@@ -199,4 +209,4 @@ Coverage otomatis:
 - [x] Tambahkan UI lobby, draw, discard, closed card, dan scoreboard.
 - [x] Tambahkan slash command dan fallback.
 - [x] Tambahkan test engine, render, import, dan command snapshot.
-- [x] Update changelog ke versi `1.1.0`.
+- [x] Update changelog ke versi `1.1.1`.

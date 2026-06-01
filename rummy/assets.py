@@ -32,10 +32,11 @@ def card_asset_path(card: RummyCard, fallback: bool = False) -> Path:
 def render_rummy_hand_image(
     cards: list[RummyCard],
     page: int,
-    selected_number: int | None = None,
+    selected_numbers: set[int] | None = None,
     page_size: int = 25,
     filename: str = "rummy_hand.jpg",
 ) -> tuple[BytesIO, str]:
+    selected_numbers = selected_numbers or set()
     start = page * page_size
     shown_cards = cards[start : start + page_size]
     if not shown_cards:
@@ -57,7 +58,7 @@ def render_rummy_hand_image(
         number = start + offset + 1
         x = pad + (offset % columns) * (thumb_width + gap)
         y = pad + header_height + (offset // columns) * (thumb_height + gap)
-        border = (236, 196, 65) if number == selected_number else (45, 48, 60)
+        border = (236, 196, 65) if number in selected_numbers else (45, 48, 60)
         draw.rounded_rectangle((x - 5, y - 5, x + thumb_width + 5, y + thumb_height + 5), radius=12, fill=border)
         canvas.paste(_open_card(card, thumb_width, thumb_height), (x, y))
         _draw_number_badge(draw, x, y, number)
@@ -68,6 +69,25 @@ def render_discard_image(card: RummyCard, filename: str = "rummy_discard.jpg") -
     image = _open_card(card, 224, 312)
     canvas = Image.new("RGB", (256, 344), (22, 24, 31))
     canvas.paste(image, (16, 16))
+    return _to_jpeg(canvas, filename)
+
+
+def render_discard_pile_image(cards: list[RummyCard], filename: str = "rummy_discards.jpg") -> tuple[BytesIO, str]:
+    shown_cards = cards[:3]
+    thumb_width, thumb_height, gap, pad, header_height = 112, 156, 14, 24, 48
+    columns = max(1, len(shown_cards))
+    canvas = Image.new(
+        "RGB",
+        (pad * 2 + columns * thumb_width + (columns - 1) * gap, pad * 2 + header_height + thumb_height),
+        (17, 19, 26),
+    )
+    draw = ImageDraw.Draw(canvas)
+    draw.text((pad, pad), "3 Buangan Teratas", fill=(245, 245, 245), font=_font(22))
+    for offset, card in enumerate(shown_cards):
+        x = pad + offset * (thumb_width + gap)
+        y = pad + header_height
+        canvas.paste(_open_card(card, thumb_width, thumb_height), (x, y))
+        _draw_number_badge(draw, x, y, offset + 1)
     return _to_jpeg(canvas, filename)
 
 
