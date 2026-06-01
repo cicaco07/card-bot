@@ -168,7 +168,7 @@ class RummyGameView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message("Pilih target dari maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi:", view=RummyDiscardView(self.channel_id, interaction.user.id), ephemeral=True)
         except RummyGameError as error:
             await reply_error(interaction, error)
 
@@ -195,7 +195,7 @@ class RummyDiscardSelect(discord.ui.Select):
         self.channel_id, self.user_id = channel_id, user_id
         game = get_rummy_session(channel_id).game
         options = [
-            discord.SelectOption(label=f"{depth}. {card.label}{self._discarded_by_name(game, user_id)}"[:100], value=str(depth))
+            discord.SelectOption(label=f"{depth}. {card.activity_label}{self._discarded_by_name(game, user_id)}"[:100], value=str(depth))
             for depth, (card, user_id) in enumerate(game.visible_discard_details(), 1)
         ]
         super().__init__(placeholder="Pilih kartu buangan", options=options or [discord.SelectOption(label="Tidak ada buangan", value="empty")])
@@ -229,7 +229,7 @@ class RummyHandSelect(discord.ui.Select):
         self.channel_id, self.user_id = channel_id, user_id
         cards = get_rummy_session(channel_id).game.hand_for(user_id)
         options = [
-            discord.SelectOption(label=f"{index}. {card.label}"[:100], value=str(index), default=index in selected_numbers)
+            discord.SelectOption(label=f"{index}. {card.activity_label}"[:100], value=str(index), default=index in selected_numbers)
             for index, card in enumerate(cards[:25], 1)
         ]
         if not options:
@@ -317,7 +317,7 @@ class RummyLayOffSelect(discord.ui.Select):
         options = []
         for player in session.game.players:
             for meld_index, meld in enumerate(player.opened_melds):
-                label = f"{player.name}: {', '.join(card.label for card in meld)}"
+                label = f"{player.name}: {', '.join(card.activity_label for card in meld)}"
                 options.append(discord.SelectOption(label=label[:100], value=f"{player.user_id}:{meld_index}"))
         super().__init__(placeholder="Pilih meld target", options=options[:25])
 

@@ -55,7 +55,7 @@ def rummy_state_text(session: RummySession) -> str:
     )
     scores = f"\n\n{rummy_scoreboard_text(session)}" if session.is_tournament else ""
     required_meld = (
-        f"{state['required_discard_meld_size']} kartu memakai {state['required_discard_meld_card']}"
+        f"minimal {state['required_discard_meld_size']} kartu memakai {state['required_discard_meld_card']}"
         if state["required_discard_meld_card"]
         else "Tidak ada"
     )
@@ -123,7 +123,7 @@ def rummy_rules_embed() -> discord.Embed:
     embed.add_field(name="Setup", value="2-4 pemain. Setiap pemain mendapat 7 kartu. Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.", inline=False)
     embed.add_field(name="Giliran", value="Ambil satu kartu dari deck atau buangan, lalu wajib buang satu kartu non-joker.", inline=False)
     embed.add_field(name="Meld", value="Run: minimal 3 kartu berurutan dengan suit sama. Set: minimal 3 kartu rank sama. Joker boleh menggantikan kartu apa pun. Meld yang sudah dibuka bisa ditambah lewat Gabungkan Meld jika hasilnya tetap valid.", inline=False)
-    embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
+    embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
     embed.add_field(name="Discard Ace", value="Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.", inline=False)
     embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Go Rummy menggandakan seluruh poin ronde.", inline=False)
     return embed
@@ -137,7 +137,7 @@ def rummy_table_visuals(session: RummySession) -> tuple[discord.Embed | None, li
     buffer, filename = render_discard_pile_image(session.game.visible_discards())
     file = discord.File(buffer, filename=filename)
     labels = "\n".join(
-        f"{index}. {card.label}{_discarded_by_text(user_id)}"
+        f"{index}. {card.activity_label}{_discarded_by_text(user_id)}"
         for index, (card, user_id) in enumerate(session.game.visible_discard_details(), 1)
     )
     embed = discord.Embed(title="3 Buangan Teratas", description=labels)
@@ -153,8 +153,8 @@ def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int
     total_pages = max(1, (len(game.hand_for(user_id)) + page_size - 1) // page_size)
     selected = ", ".join(str(number) for number in sorted(selected_numbers or set())) or "belum ada"
     required_meld = (
-        f"\nWajib turunkan meld bukti **{game.required_discard_meld_size} kartu** yang memakai "
-        f"**{game.required_discard_meld_card.label}** sebelum membuang kartu."
+        f"\nWajib turunkan meld bukti **minimal {game.required_discard_meld_size} kartu** yang memakai "
+        f"**{game.required_discard_meld_card.activity_label}** sebelum membuang kartu."
         if game.required_discard_meld_card
         else ""
     )

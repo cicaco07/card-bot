@@ -162,7 +162,7 @@ class RummyGame:
         return RummyActionResult(
             [
                 f"{player.name} mengambil {depth} kartu dari buangan dengan target {target_card.activity_label}.",
-                f"{player.name} wajib menurunkan meld bukti {required_meld_size} kartu yang memakai "
+                f"{player.name} wajib menurunkan meld bukti minimal {required_meld_size} kartu yang memakai "
                 f"{target_card.activity_label} sebelum membuang kartu.",
             ]
         )
@@ -181,10 +181,10 @@ class RummyGame:
             raise RummyGameError("Kartu pilihan belum membentuk run atau set yang valid.")
         required_card = self.required_discard_meld_card
         if required_card is not None:
-            if len(meld) != self.required_discard_meld_size:
-                raise RummyGameError(f"Meld bukti buangan wajib terdiri dari {self.required_discard_meld_size} kartu.")
+            if len(meld) < self.required_discard_meld_size:
+                raise RummyGameError(f"Meld bukti buangan wajib terdiri dari minimal {self.required_discard_meld_size} kartu.")
             if not any(card is required_card for card in meld):
-                raise RummyGameError(f"Turunkan meld bukti yang memakai {required_card.label} terlebih dahulu.")
+                raise RummyGameError(f"Turunkan meld bukti yang memakai {required_card.activity_label} terlebih dahulu.")
             original_support_count = sum(
                 any(card is original_card for original_card in self.required_discard_meld_hand_cards)
                 for card in meld
@@ -300,22 +300,22 @@ class RummyGame:
             "status": self.status.value,
             "current_player_id": current_player_id,
             "phase": "buang kartu" if self.awaiting_discard_user_id is not None else "ambil kartu",
-            "required_discard_meld_card": self.required_discard_meld_card.label if self.required_discard_meld_card else None,
+            "required_discard_meld_card": self.required_discard_meld_card.activity_label if self.required_discard_meld_card else None,
             "required_discard_meld_size": self.required_discard_meld_size,
             "deck_count": len(self.deck),
-            "top_discard": self.discard_pile[-1].label if self.discard_pile else "Belum ada",
-            "visible_discards": [card.label for card in self.visible_discards()],
+            "top_discard": self.discard_pile[-1].activity_label if self.discard_pile else "Belum ada",
+            "visible_discards": [card.activity_label for card in self.visible_discards()],
             "visible_discard_user_ids": [user_id for _card, user_id in self.visible_discard_details()],
             "discard_count": len(self.discard_pile),
             "hand_counts": [(player.user_id, player.name, len(player.hand)) for player in self.players],
             "opened_melds": [
-                (player.user_id, player.name, [[card.label for card in meld] for meld in player.opened_melds])
+                (player.user_id, player.name, [[card.activity_label for card in meld] for meld in player.opened_melds])
                 for player in self.players
             ],
             "scores": dict(self.scores),
             "score_breakdowns": {user_id: dict(details) for user_id, details in self.score_breakdowns.items()},
             "closed_user_id": self.closed_user_id,
-            "closed_card": self.closed_card.label if self.closed_card else None,
+            "closed_card": self.closed_card.activity_label if self.closed_card else None,
             "go_rummy_user_id": self.go_rummy_user_id,
         }
 
@@ -377,7 +377,7 @@ class RummyGame:
     def _ensure_required_discard_meld_completed(self) -> None:
         if self.required_discard_meld_card is not None:
             raise RummyGameError(
-                f"Turunkan meld bukti yang memakai {self.required_discard_meld_card.label} terlebih dahulu."
+                f"Turunkan meld bukti yang memakai {self.required_discard_meld_card.activity_label} terlebih dahulu."
             )
 
     def _ensure_draw_turn(self, user_id: int) -> None:

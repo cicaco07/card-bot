@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.9 - 2026-06-01
+
+Emoji suit dan meld joker panjang Rummy.
+
+- Mengganti seluruh label kartu publik Rummy menjadi simbol suit ringkas seperti `6 ♦️`.
+- Mengizinkan meld bukti buangan berisi lebih dari 3 kartu selama tetap valid.
+- Memastikan run seperti `4-5-Joker-7-8` diterima.
+
 ## 1.1.8 - 2026-06-01
 
 Koreksi meld bukti ambil tiga buangan Rummy.

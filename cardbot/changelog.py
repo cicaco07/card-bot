@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.9",
+        "title": "Emoji suit dan meld joker panjang Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mengganti seluruh label kartu publik Rummy menjadi simbol suit ringkas seperti 6 ♦️.",
+            "Mengizinkan meld bukti buangan berisi lebih dari 3 kartu selama tetap valid.",
+            "Memastikan run seperti 4-5-Joker-7-8 diterima.",
+        ],
+    },
+    {
         "version": "1.1.8",
         "title": "Koreksi meld bukti ambil tiga buangan Rummy",
         "date": "2026-06-01",

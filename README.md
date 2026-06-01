@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.8`
+Versi saat ini: `1.1.9`
 
 Command changelog:
 
@@ -288,7 +288,7 @@ Rules utama:
 - Pemain 2-4 orang dan mendapat 7 kartu.
 - Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.
 - Setiap giliran ambil satu kartu dari deck atau buangan, lalu buang satu kartu.
-- Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1-3 kartu wajib meld bukti 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci.
+- Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1-3 kartu wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci.
 - Panel 3 buangan teratas menampilkan pemain yang membuang setiap kartu.
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
 - Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.

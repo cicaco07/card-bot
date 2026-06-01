@@ -53,13 +53,19 @@ def test_rummy_playing_text_shows_discarding_players() -> None:
     session.game.status = RummyStatus.PLAYING
     session.game.players = [
         RummyPlayer(1, "Alice", [RummyCard("2", "hearts")]),
-        RummyPlayer(2, "Bob", [RummyCard("3", "clubs")]),
+        RummyPlayer(
+            2,
+            "Bob",
+            [RummyCard("3", "clubs")],
+            opened_melds=[(RummyCard("J", "hearts"), RummyCard("Q", "hearts"), RummyCard("K", "hearts"))],
+        ),
     ]
     session.game.discard_pile = [RummyCard("4", "diamonds"), RummyCard("5", "clubs")]
     session.game.discarded_by_user_ids = [1, 2]
     text = rummy_state_text(session)
-    assert "Kartu buangan teratas: **5 of Clubs** - dibuang oleh <@2>" in text
-    assert "3 buangan teratas:\n- 1. 5 of Clubs - dibuang oleh <@2>\n- 2. 4 of Diamonds - dibuang oleh <@1>" in text
+    assert "Kartu buangan teratas: **5 ♣️** - dibuang oleh <@2>" in text
+    assert "3 buangan teratas:\n- 1. 5 ♣️ - dibuang oleh <@2>\n- 2. 4 ♦️ - dibuang oleh <@1>" in text
+    assert "Meld terbuka dan terkunci:\n- <@2>: [J ♥️, Q ♥️, K ♥️]" in text
 
 
 def test_rummy_finished_text_shows_score_breakdown() -> None:
