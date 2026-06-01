@@ -54,25 +54,94 @@ def test_meld_validation_supports_run_set_and_joker() -> None:
     assert can_partition_into_melds(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("8", "diamonds"), ("8", "clubs"), ("8", "spades")))
 
 
-def test_draw_from_discard_opens_locked_meld_and_takes_cards_above_target() -> None:
+def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_target() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"), ("6", "hearts"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"), ("9", "clubs"))
+    assert game.draw_from_discard(1, 2).public_messages == [
+        "Alice mengambil 2 kartu dari buangan dengan target 4 of Hearts.",
+        "Alice wajib menurunkan meld bukti 4 kartu yang memakai 4 of Hearts sebelum membuang kartu.",
+    ]
+    assert game.discard_pile == []
+    assert game.players[0].hand == cards(("9", "clubs"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"), ("6", "hearts"))
+    assert game.players[0].opened_melds == []
+    with pytest.raises(RummyGameError, match="Turunkan meld bukti"):
+        game.discard_card(1, 1)
+    with pytest.raises(RummyGameError, match="wajib terdiri dari 4 kartu"):
+        game.lay_down_meld(1, [2, 3, 4])
+    assert game.lay_down_meld(1, [2, 3, 4, 5]).public_messages == [
+        "Alice menurunkan meld bukti dan menguncinya: 3 of Hearts, 4 of Hearts, 5 of Hearts, 6 of Hearts."
+    ]
+    assert game.players[0].hand == cards(("9", "clubs"))
+    assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts"), ("6", "hearts")))]
+    assert game.required_discard_meld_card is None
+
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("2", "hearts"), ("3", "hearts"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"), ("5", "hearts"), ("6", "hearts"))
+    game.draw_from_discard(1, 3)
+    with pytest.raises(RummyGameError, match="minimal 2 kartu dari tangan sebelumnya"):
+        game.lay_down_meld(1, [2, 3, 4, 5])
+
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"), ("6", "hearts"))), RummyPlayer(2, "Bob")]
+    game.discard_pile = cards(("4", "hearts"))
+    game.draw_from_discard(1, 1)
+    with pytest.raises(RummyGameError, match="wajib terdiri dari 3 kartu"):
+        game.lay_down_meld(1, [1, 2, 3, 4])
+    assert game.lay_down_meld(1, [1, 2, 3]).public_messages == [
+        "Alice menurunkan meld bukti dan menguncinya: 3 of Hearts, 4 of Hearts, 5 of Hearts."
+    ]
+
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "hearts"))), RummyPlayer(2, "Bob")]
     game.discard_pile = cards(("4", "hearts"), ("9", "clubs"))
-    assert game.draw_from_discard(1, 2).public_messages == [
-        "Alice mengambil 2 kartu dari buangan dengan target 4 of Hearts.",
-        "Meld bukti Alice dibuka dan dikunci: 3 of Hearts, 5 of Hearts, 4 of Hearts.",
-    ]
-    assert game.discard_pile == []
-    assert game.players[0].hand == cards(("9", "clubs"))
-    assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("5", "hearts"), ("4", "hearts")))]
+    with pytest.raises(RummyGameError, match="meld bukti 4 kartu"):
+        game.draw_from_discard(1, 2)
 
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [RummyPlayer(1, "Alice", cards(("3", "hearts"), ("5", "spades"))), RummyPlayer(2, "Bob")]
     game.discard_pile = cards(("4", "clubs"))
-    with pytest.raises(RummyGameError, match="langsung melengkapi meld"):
+    with pytest.raises(RummyGameError, match="meld bukti 3 kartu"):
         game.draw_from_discard(1, 1)
+
+
+def test_empty_hand_from_meld_continues_round_and_skips_players_without_cards() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [
+        RummyPlayer(1, "Alice", cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"))),
+        RummyPlayer(2, "Bob"),
+        RummyPlayer(3, "Charlie", cards(("9", "clubs"))),
+    ]
+    game.deck = cards(("K", "spades"))
+    game.awaiting_discard_user_id = 1
+    assert game.lay_down_meld(1, [1, 2, 3]).public_messages == [
+        "Alice menghabiskan seluruh kartu melalui meld. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Giliran berikutnya: Charlie.",
+    ]
+    assert game.status == RummyStatus.PLAYING
+    assert game.current_player.user_id == 3
+
+
+def test_empty_hand_from_regular_discard_continues_round() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("9", "clubs"))), RummyPlayer(2, "Bob", cards(("8", "clubs")))]
+    game.deck = cards(("K", "spades"))
+    game.awaiting_discard_user_id = 1
+    game.last_draw_source = "deck"
+    assert game.discard_card(1, 1).public_messages == [
+        "Alice menghabiskan seluruh kartu dengan membuang 9 of Clubs. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Giliran berikutnya: Bob.",
+    ]
+    assert game.status == RummyStatus.PLAYING
+    assert game.current_player.user_id == 2
 
 
 def test_visible_discards_are_limited_to_three_cards() -> None:

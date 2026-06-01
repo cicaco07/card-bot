@@ -5,6 +5,26 @@ from __future__ import annotations
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.3",
+        "title": "Penegasan meld bukti buangan Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mewajibkan meld bukti tepat 3 kartu saat mengambil 1 kartu buangan.",
+            "Mewajibkan meld bukti tepat 4 kartu saat mengambil 2-3 kartu buangan.",
+            "Menampilkan jumlah kartu meld bukti yang diwajibkan pada meja dan panel kartu pemain.",
+        ],
+    },
+    {
+        "version": "1.1.2",
+        "title": "Perbaikan alur giliran Rummy",
+        "date": "2026-06-01",
+        "changes": [
+            "Mengubah meld bukti setelah mengambil buangan menjadi pilihan manual pemain sambil tetap mewajibkan kartu target dipakai sebelum discard.",
+            "Melanjutkan ronde setelah pemain menghabiskan tangan melalui meld atau discard biasa selama deck belum habis dan belum ada closed card.",
+            "Melewati pemain yang sudah tidak memiliki kartu saat menentukan giliran berikutnya.",
+        ],
+    },
+    {
         "version": "1.1.1",
         "title": "Penyempurnaan rules Rummy",
         "date": "2026-06-01",

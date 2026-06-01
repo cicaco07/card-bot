@@ -51,6 +51,9 @@ class RummyGame:
         self.turn_index = 0
         self.awaiting_discard_user_id: int | None = None
         self.last_draw_source: str | None = None
+        self.required_discard_meld_card: RummyCard | None = None
+        self.required_discard_meld_hand_cards: tuple[RummyCard, ...] = ()
+        self.required_discard_meld_size: int | None = None
         self.scores: dict[int, int] = {}
         self.closed_user_id: int | None = None
         self.closed_card: RummyCard | None = None
@@ -82,6 +85,9 @@ class RummyGame:
         self.turn_index = 0
         self.awaiting_discard_user_id = None
         self.last_draw_source = None
+        self.required_discard_meld_card = None
+        self.required_discard_meld_hand_cards = ()
+        self.required_discard_meld_size = None
         self.scores = {}
         self.closed_user_id = None
         self.closed_card = None
@@ -126,25 +132,28 @@ class RummyGame:
             raise RummyGameError("Kartu buangan itu tidak tersedia dalam batas 3 kartu teratas.")
         player = self.current_player
         target_card = discards[depth - 1]
-        supporting_cards = self._discard_draw_meld(player.hand, target_card)
-        if supporting_cards is None:
-            raise RummyGameError("Kartu buangan hanya boleh diambil jika langsung melengkapi meld dari minimal 2 kartu tangan.")
-        player.had_opened_meld_before_turn = bool(player.opened_melds)
         picked_cards = self.discard_pile[-depth:]
+        required_meld_size = 3 if depth == 1 else 4
+        if self._discard_draw_meld(player.hand, target_card, picked_cards[1:], required_meld_size) is None:
+            raise RummyGameError(
+                f"Kartu buangan hanya boleh diambil jika bisa membentuk meld bukti {required_meld_size} kartu "
+                "dengan minimal 2 kartu dari tangan."
+            )
+        player.had_opened_meld_before_turn = bool(player.opened_melds)
+        original_hand = tuple(player.hand)
         del self.discard_pile[-depth:]
-        for card in supporting_cards:
-            player.hand.remove(card)
-        opened_meld = (*supporting_cards, target_card)
-        player.opened_melds.append(tuple(opened_meld))
-        player.hand.extend(picked_cards[1:])
+        player.hand.extend(picked_cards)
         player.hand = self._sort_cards(player.hand)
         self.awaiting_discard_user_id = user_id
         self.last_draw_source = "discard"
-        meld_text = ", ".join(card.label for card in opened_meld)
+        self.required_discard_meld_card = target_card
+        self.required_discard_meld_hand_cards = original_hand
+        self.required_discard_meld_size = required_meld_size
         return RummyActionResult(
             [
                 f"{player.name} mengambil {depth} kartu dari buangan dengan target {target_card.label}.",
-                f"Meld bukti {player.name} dibuka dan dikunci: {meld_text}.",
+                f"{player.name} wajib menurunkan meld bukti {required_meld_size} kartu yang memakai "
+                f"{target_card.label} sebelum membuang kartu.",
             ]
         )
 
@@ -160,13 +169,31 @@ class RummyGame:
         meld = [player.hand[number - 1] for number in sorted(card_numbers)]
         if not is_valid_meld(meld):
             raise RummyGameError("Kartu pilihan belum membentuk run atau set yang valid.")
+        required_card = self.required_discard_meld_card
+        if required_card is not None:
+            if len(meld) != self.required_discard_meld_size:
+                raise RummyGameError(f"Meld bukti buangan wajib terdiri dari {self.required_discard_meld_size} kartu.")
+            if not any(card is required_card for card in meld):
+                raise RummyGameError(f"Turunkan meld bukti yang memakai {required_card.label} terlebih dahulu.")
+            original_support_count = sum(
+                any(card is original_card for original_card in self.required_discard_meld_hand_cards)
+                for card in meld
+            )
+            if original_support_count < 2:
+                raise RummyGameError("Meld bukti buangan wajib memakai minimal 2 kartu dari tangan sebelumnya.")
         for card in meld:
             player.hand.remove(card)
         player.opened_melds.append(tuple(meld))
         meld_text = ", ".join(card.label for card in meld)
-        messages = [f"{player.name} menurunkan meld dan menguncinya: {meld_text}."]
+        if required_card is not None:
+            self.required_discard_meld_card = None
+            self.required_discard_meld_hand_cards = ()
+            self.required_discard_meld_size = None
+            messages = [f"{player.name} menurunkan meld bukti dan menguncinya: {meld_text}."]
+        else:
+            messages = [f"{player.name} menurunkan meld dan menguncinya: {meld_text}."]
         if not player.hand:
-            return self._finish(
+            return self._complete_empty_hand_turn(
                 f"{player.name} menghabiskan seluruh kartu melalui meld.",
                 go_rummy=not player.had_opened_meld_before_turn,
             )
@@ -181,6 +208,7 @@ class RummyGame:
     ) -> RummyActionResult:
         self._ensure_discard_turn(user_id)
         player = self.current_player
+        self._ensure_required_discard_meld_completed()
         if not card_numbers:
             raise RummyGameError("Pilih minimal 1 kartu untuk digabungkan ke meld.")
         if len(set(card_numbers)) != len(card_numbers):
@@ -200,7 +228,7 @@ class RummyGame:
         cards_text = ", ".join(card.label for card in selected_cards)
         messages = [f"{player.name} menggabungkan {cards_text} ke meld terbuka {target_player.name}."]
         if not player.hand:
-            return self._finish(
+            return self._complete_empty_hand_turn(
                 f"{player.name} menghabiskan seluruh kartu melalui gabungan meld.",
                 go_rummy=not player.had_opened_meld_before_turn,
             )
@@ -209,6 +237,7 @@ class RummyGame:
     def discard_card(self, user_id: int, card_number: int, close: bool = False) -> RummyActionResult:
         self._ensure_discard_turn(user_id)
         player = self.current_player
+        self._ensure_required_discard_meld_completed()
         if card_number < 1 or card_number > len(player.hand):
             raise RummyGameError("Nomor kartu tidak ada di tanganmu.")
         card = player.hand[card_number - 1]
@@ -237,18 +266,18 @@ class RummyGame:
                 go_rummy=not player.had_opened_meld_before_turn,
             )
         if not player.hand:
-            return self._finish(
+            return self._complete_empty_hand_turn(
                 f"{player.name} menghabiskan seluruh kartu dengan membuang {card.label}.",
                 go_rummy=not player.had_opened_meld_before_turn,
             )
         if not self.deck:
             return self._finish(f"{player.name} membuang {card.label}. Deck habis. Perhitungan skor dimulai.")
 
-        self.turn_index = (self.turn_index + 1) % len(self.players)
+        next_player = self._advance_to_next_player_with_cards()
         return RummyActionResult(
             [
                 f"{player.name} membuang {card.label} setelah mengambil dari {source}.",
-                f"Giliran berikutnya: {self.current_player.name}.",
+                f"Giliran berikutnya: {next_player.name}.",
             ]
         )
 
@@ -260,6 +289,8 @@ class RummyGame:
             "status": self.status.value,
             "current_player_id": current_player_id,
             "phase": "buang kartu" if self.awaiting_discard_user_id is not None else "ambil kartu",
+            "required_discard_meld_card": self.required_discard_meld_card.label if self.required_discard_meld_card else None,
+            "required_discard_meld_size": self.required_discard_meld_size,
             "deck_count": len(self.deck),
             "top_discard": self.discard_pile[-1].label if self.discard_pile else "Belum ada",
             "visible_discards": [card.label for card in self.visible_discards()],
@@ -279,21 +310,50 @@ class RummyGame:
         self.status = RummyStatus.FINISHED
         self.awaiting_discard_user_id = None
         self.last_draw_source = None
+        self.required_discard_meld_card = None
+        self.required_discard_meld_hand_cards = ()
+        self.required_discard_meld_size = None
         self.scores = {
             player.user_id: score_hand(player.hand) + sum(card.point_value for meld in player.opened_melds for card in meld)
             for player in self.players
         }
         if self.closed_user_id is not None:
             self.scores[self.closed_user_id] += closed_bonus
-        if go_rummy and self.closed_user_id is not None:
-            self.go_rummy_user_id = self.closed_user_id
-        elif go_rummy:
-            self.go_rummy_user_id = next((player.user_id for player in self.players if not player.hand), None)
+        if go_rummy:
+            self.go_rummy_user_id = self.closed_user_id or next((player.user_id for player in self.players if not player.hand), None)
         if self.go_rummy_user_id is not None:
             self.scores = {user_id: score * 2 for user_id, score in self.scores.items()}
             message += " Go Rummy aktif: seluruh poin ronde dikalikan 2."
         score_text = ", ".join(f"{player.name} {self.scores[player.user_id]:+d}" for player in self.players)
         return RummyActionResult([message, f"Skor ronde: {score_text}."], dict(self.scores), self.closed_user_id)
+
+    def _complete_empty_hand_turn(self, message: str, go_rummy: bool = False) -> RummyActionResult:
+        player = self.current_player
+        self.awaiting_discard_user_id = None
+        self.last_draw_source = None
+        if go_rummy and self.go_rummy_user_id is None:
+            self.go_rummy_user_id = player.user_id
+            message += " Go Rummy aktif untuk perhitungan skor akhir."
+        if not self.deck:
+            return self._finish(f"{message} Deck habis. Perhitungan skor dimulai.")
+        if not any(other.hand for other in self.players):
+            return self._finish(f"{message} Seluruh pemain telah menghabiskan kartu. Perhitungan skor dimulai.")
+        next_player = self._advance_to_next_player_with_cards()
+        return RummyActionResult([message, f"Giliran berikutnya: {next_player.name}."])
+
+    def _advance_to_next_player_with_cards(self) -> RummyPlayer:
+        for offset in range(1, len(self.players) + 1):
+            next_index = (self.turn_index + offset) % len(self.players)
+            if self.players[next_index].hand:
+                self.turn_index = next_index
+                return self.players[next_index]
+        raise RummyGameError("Tidak ada pemain dengan kartu tersisa.")
+
+    def _ensure_required_discard_meld_completed(self) -> None:
+        if self.required_discard_meld_card is not None:
+            raise RummyGameError(
+                f"Turunkan meld bukti yang memakai {self.required_discard_meld_card.label} terlebih dahulu."
+            )
 
     def _ensure_draw_turn(self, user_id: int) -> None:
         self._ensure_playing()
@@ -320,11 +380,17 @@ class RummyGame:
         return player
 
     @staticmethod
-    def _discard_draw_meld(hand: list[RummyCard], discard: RummyCard) -> list[RummyCard] | None:
-        for size in range(2, len(hand) + 1):
-            for selected in combinations(hand, size):
-                if is_valid_meld([*selected, discard]):
-                    return list(selected)
+    def _discard_draw_meld(
+        hand: list[RummyCard],
+        discard: RummyCard,
+        additional_cards: list[RummyCard],
+        meld_size: int,
+    ) -> list[RummyCard] | None:
+        for selected in combinations([*hand, *additional_cards], meld_size - 1):
+            if sum(any(card is hand_card for hand_card in hand) for card in selected) < 2:
+                continue
+            if is_valid_meld([*selected, discard]):
+                return list(selected)
         return None
 
     @staticmethod

@@ -6,6 +6,22 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.3 - 2026-06-01
+
+Penegasan meld bukti buangan Rummy.
+
+- Mewajibkan meld bukti tepat 3 kartu saat mengambil 1 kartu buangan.
+- Mewajibkan meld bukti tepat 4 kartu saat mengambil 2-3 kartu buangan.
+- Menampilkan jumlah kartu meld bukti yang diwajibkan pada meja dan panel kartu pemain.
+
+## 1.1.2 - 2026-06-01
+
+Perbaikan alur giliran Rummy.
+
+- Mengubah meld bukti setelah mengambil buangan menjadi pilihan manual pemain sambil tetap mewajibkan kartu target dipakai sebelum discard.
+- Melanjutkan ronde setelah pemain menghabiskan tangan melalui meld atau discard biasa selama deck belum habis dan belum ada closed card.
+- Melewati pemain yang sudah tidak memiliki kartu saat menentukan giliran berikutnya.
+
 ## 1.1.1 - 2026-06-01
 
 Penyempurnaan rules Rummy.

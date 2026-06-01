@@ -25,6 +25,7 @@ def test_rummy_lobby_and_playing_text() -> None:
     session.log = ["Game dimulai."]
     assert rummy_state_text(session) == (
         "**Rummy: Game Berjalan**\nGilirannya: <@1>\nFase giliran: **ambil kartu**\n"
+        "Kewajiban meld buangan: **Tidak ada**\n"
         "Sisa deck: **1 kartu**\nKartu buangan teratas: **Belum ada**\nTotal buangan: 0\n"
         "3 buangan teratas:\n- Belum ada\n\n"
         "Meld terbuka dan terkunci:\n- Belum ada meld yang diturunkan.\n\n"

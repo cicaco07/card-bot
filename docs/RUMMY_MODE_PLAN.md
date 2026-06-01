@@ -32,7 +32,7 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 - Setiap giliran dimulai pada fase draw lalu wajib diakhiri dengan discard.
 - Kartu buangan dapat dipilih dari maksimal 3 kartu teratas.
 - Saat memilih discard lebih dalam, seluruh kartu di atas target ikut diambil ke hand.
-- Kartu target buangan wajib langsung membentuk meld bukti bersama minimal 2 kartu tangan, dibuka ke semua pemain, dan dikunci.
+- Setelah mengambil 1 kartu buangan, pemain wajib memilih sendiri meld bukti 3 kartu. Setelah mengambil 2-3 kartu buangan, pemain wajib memilih sendiri meld bukti 4 kartu. Meld wajib memakai kartu target bersama minimal 2 kartu tangan sebelumnya, lalu dibuka ke semua pemain dan dikunci sebelum pemain boleh membuang kartu.
 - Pemain dapat menurunkan meld dari hand. Meld yang sudah terbuka tidak bisa diganti.
 - Pemain dapat menggabungkan kartu ke meld terbuka milik sendiri atau pemain lain jika hasilnya tetap valid.
 - Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
@@ -40,6 +40,7 @@ Brief awal memiliki beberapa bagian yang dapat ditafsirkan berbeda. Implementasi
 - Joker tidak boleh dibuang sebagai discard biasa.
 - Joker boleh dipakai sebagai closed card.
 - Closed card valid jika seluruh kartu yang tersisa di tangan dapat dipartisi menjadi meld.
+- Menghabiskan kartu melalui meld atau discard biasa tidak langsung menutup ronde. Pemain tanpa kartu dilewati dan ronde berlanjut sampai deck habis atau ada pemain yang melakukan closed card.
 - Bonus closed card hanya diberikan jika draw terakhir berasal dari deck, sesuai brief awal.
 - Run memakai rank `2, 3, ..., 10, J, Q, K, A`; Ace tinggi dan tidak wrap.
 - Go Rummy terjadi jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut. Seluruh poin ronde dikalikan 2.

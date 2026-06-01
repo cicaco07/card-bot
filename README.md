@@ -288,11 +288,12 @@ Rules utama:
 - Pemain 2-4 orang dan mendapat 7 kartu.
 - Deck memakai 52 kartu standar dan 4 joker: 2 merah dan 2 hitam.
 - Setiap giliran ambil satu kartu dari deck atau buangan, lalu buang satu kartu.
-- Buangan dapat dipilih dari maksimal 3 kartu teratas. Kartu target wajib langsung menjadi meld bukti, dibuka ke semua pemain, dan dikunci.
+- Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1 kartu wajib meld bukti 3 kartu; mengambil 2-3 kartu wajib meld bukti 4 kartu. Pemain memilih sendiri meld yang memakai kartu target sebelum membuang kartu. Meld lalu dibuka ke semua pemain dan dikunci.
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
 - Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
 - Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld.
 - Tombol **Closed Card** mengakhiri ronde jika seluruh kartu tersisa sudah menjadi meld.
+- Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
 - Bonus closed card setelah draw deck: angka +50, J/Q/K +100, Ace +150, joker +250.
 - Go Rummy menggandakan seluruh poin ronde jika pemain menghabiskan seluruh kartunya dalam satu permainan tanpa pernah menurunkan kartu sebelumnya pada ronde tersebut.
