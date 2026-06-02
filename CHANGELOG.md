@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.13 - 2026-06-02
+
+Penalti flip tunggal dan batas joker Rummy.
+
+- Menerapkan penalti flip maksimal satu kali per pemain terdampak saat **Closed Card**, bukan setiap kali kartu buangan dijadikan meld bukti.
+- Menyembunyikan kandidat penalti flip selama ronde masih berjalan dan menampilkannya pada hasil akhir.
+- Membatasi joker agar hanya dapat menggantikan kartu angka `2-10`, bukan `J`, `Q`, `K`, atau Ace.
+
 ## 1.1.12 - 2026-06-02
 
 Skor normal dan rincian closed card Rummy.

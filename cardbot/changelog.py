@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.13",
+        "title": "Penalti flip tunggal dan batas joker Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Menerapkan penalti flip maksimal satu kali per pemain terdampak saat closed card, bukan setiap kali kartu buangan dijadikan meld bukti.",
+            "Menyembunyikan kandidat penalti flip selama ronde masih berjalan dan menampilkannya pada hasil akhir.",
+            "Membatasi joker agar hanya dapat menggantikan kartu angka 2-10, bukan J, Q, K, atau Ace.",
+        ],
+    },
+    {
         "version": "1.1.12",
         "title": "Skor normal dan rincian closed card Rummy",
         "date": "2026-06-02",

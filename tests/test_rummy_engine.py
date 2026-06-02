@@ -53,6 +53,10 @@ def test_meld_validation_supports_run_set_and_joker() -> None:
     assert is_valid_meld(cards(("K", "diamonds"), ("K", "clubs"), ("K", "spades")))
     assert is_valid_meld([RummyCard("2", "hearts"), joker, RummyCard("4", "hearts")])
     assert is_valid_meld([RummyCard("4", "hearts"), RummyCard("5", "hearts"), joker, RummyCard("7", "hearts"), RummyCard("8", "hearts")])
+    assert is_valid_meld([RummyCard("10", "hearts"), RummyCard("J", "hearts"), RummyCard("Q", "hearts"), joker])
+    assert not is_valid_meld([RummyCard("Q", "hearts"), RummyCard("K", "hearts"), joker])
+    assert not is_valid_meld([RummyCard("J", "diamonds"), RummyCard("J", "clubs"), joker])
+    assert not is_valid_meld([RummyCard("A", "diamonds"), RummyCard("A", "clubs"), joker])
     assert not is_valid_meld(cards(("2", "hearts"), ("4", "hearts"), ("6", "hearts")))
     assert can_partition_into_melds(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("8", "diamonds"), ("8", "clubs"), ("8", "spades")))
 
@@ -70,16 +74,16 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
     ]
     assert game.discard_pile == []
     assert game.discarded_by_user_ids == []
-    assert game.flipped_cards_by_user_id == {}
+    assert game.flip_source_cards_by_user_id == {}
     assert game.players[0].hand == cards(("9", "clubs"), ("3", "hearts"), ("4", "hearts"), ("5", "hearts"))
     assert game.players[0].opened_melds == []
     with pytest.raises(RummyGameError, match="Turunkan meld bukti"):
         game.discard_card(1, 1)
     assert game.lay_down_meld(1, [2, 3, 4]).public_messages == [
         "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️.",
-        "Bob mendapat tanda flip karena 4 ♥️ dijadikan meld bukti. Nilai penalti mengikuti closed card.",
     ]
-    assert game.flipped_cards_by_user_id == {2: [RummyCard("4", "hearts")]}
+    assert game.flip_source_cards_by_user_id == {2: [RummyCard("4", "hearts")]}
+    assert game.public_state()["flipped_cards"] == []
     assert game.players[0].hand == cards(("9", "clubs"))
     assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
     assert game.required_discard_meld_card is None
@@ -266,7 +270,7 @@ def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
     game.deck = cards(("K", "spades"))
     game.awaiting_discard_user_id = 1
     game.last_draw_source = "deck"
-    game.flipped_cards_by_user_id = {2: cards(("J", "hearts"))}
+    game.flip_source_cards_by_user_id = {2: cards(("J", "hearts"))}
 
     result = game.discard_card(1, 1, close=True)
 
@@ -291,17 +295,32 @@ def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
     }
 
 
-def test_flip_marks_do_not_apply_penalty_without_closed_card() -> None:
+def test_flip_sources_do_not_apply_penalty_without_closed_card() -> None:
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [RummyPlayer(1, "Alice", cards(("2", "spades"))), RummyPlayer(2, "Bob", cards(("9", "clubs")))]
-    game.flipped_cards_by_user_id = {2: cards(("J", "hearts"))}
+    game.flip_source_cards_by_user_id = {2: cards(("J", "hearts"))}
 
     result = game.draw_from_deck(1)
 
     assert result.scores == {1: -5, 2: -5}
     assert game.score_breakdowns[2]["flip_penalty_points"] == 0
     assert game.score_breakdowns[2]["flip_penalty_card"] is None
+
+
+def test_multiple_discard_meld_sources_only_apply_one_flip_penalty_per_player() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("2", "spades"))), RummyPlayer(2, "Bob", cards(("9", "clubs")))]
+    game.awaiting_discard_user_id = 1
+    game.last_draw_source = "deck"
+    game.flip_source_cards_by_user_id = {2: cards(("4", "hearts"), ("J", "hearts"))}
+
+    result = game.discard_card(1, 1, close=True)
+
+    assert result.scores[2] == -55
+    assert game.score_breakdowns[2]["flip_penalty_points"] == 50
+    assert game.score_breakdowns[2]["flip_cards"] == ["4 ♥️", "J ♥️"]
 
 
 def test_ace_discard_requires_own_non_ace_opened_meld() -> None:

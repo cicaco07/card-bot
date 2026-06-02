@@ -11,6 +11,10 @@ import random
 from .cards import RANKS, SUITS, RummyCard
 
 
+NUMBER_RANKS = frozenset({"2", "3", "4", "5", "6", "7", "8", "9", "10"})
+NUMBER_RANK_VALUES = frozenset(index for index, rank in enumerate(RANKS) if rank in NUMBER_RANKS)
+
+
 class RummyGameError(Exception):
     """Raised when a player tries to perform an invalid rummy action."""
 
@@ -57,7 +61,7 @@ class RummyGame:
         self.required_discard_meld_discarder_user_id: int | None = None
         self.scores: dict[int, int] = {}
         self.score_breakdowns: dict[int, dict[str, object]] = {}
-        self.flipped_cards_by_user_id: dict[int, list[RummyCard]] = {}
+        self.flip_source_cards_by_user_id: dict[int, list[RummyCard]] = {}
         self.closed_user_id: int | None = None
         self.closed_card: RummyCard | None = None
 
@@ -93,7 +97,7 @@ class RummyGame:
         self.required_discard_meld_discarder_user_id = None
         self.scores = {}
         self.score_breakdowns = {}
-        self.flipped_cards_by_user_id = {}
+        self.flip_source_cards_by_user_id = {}
         self.closed_user_id = None
         self.closed_card = None
         self.status = RummyStatus.PLAYING
@@ -205,11 +209,7 @@ class RummyGame:
             self.required_discard_meld_discarder_user_id = None
             messages = [f"{player.name} menurunkan meld bukti dan menguncinya: {meld_text}."]
             if target_discarder is not None:
-                self.flipped_cards_by_user_id.setdefault(target_discarder.user_id, []).append(required_card)
-                messages.append(
-                    f"{target_discarder.name} mendapat tanda flip karena {required_card.activity_label} dijadikan meld bukti. "
-                    "Nilai penalti mengikuti closed card."
-                )
+                self.flip_source_cards_by_user_id.setdefault(target_discarder.user_id, []).append(required_card)
         else:
             messages = [f"{player.name} menurunkan meld dan menguncinya: {meld_text}."]
         if not player.hand:
@@ -320,9 +320,11 @@ class RummyGame:
             "scores": dict(self.scores),
             "score_breakdowns": {user_id: dict(details) for user_id, details in self.score_breakdowns.items()},
             "flipped_cards": [
-                (player.user_id, [card.activity_label for card in self.flipped_cards_by_user_id.get(player.user_id, [])])
+                (player.user_id, [card.activity_label for card in self.flip_source_cards_by_user_id.get(player.user_id, [])])
                 for player in self.players
-                if self.flipped_cards_by_user_id.get(player.user_id)
+                if self.status == RummyStatus.FINISHED
+                and self.closed_card is not None
+                and self.flip_source_cards_by_user_id.get(player.user_id)
             ],
             "closed_user_id": self.closed_user_id,
             "closed_card": self.closed_card.activity_label if self.closed_card else None,
@@ -342,8 +344,8 @@ class RummyGame:
             opened_meld_points = _melds_point_value(player.opened_melds)
             hand_meld_points = _melds_point_value(hand_melds)
             deadwood_points = sum(card.point_value for card in deadwood_cards)
-            flipped_cards = self.flipped_cards_by_user_id.get(player.user_id, [])
-            flip_penalty_points = len(flipped_cards) * (flip_card_penalty(self.closed_card) if self.closed_card else 0)
+            flipped_cards = self.flip_source_cards_by_user_id.get(player.user_id, [])
+            flip_penalty_points = flip_card_penalty(self.closed_card) if self.closed_card and flipped_cards else 0
             subtotal = opened_meld_points + hand_meld_points - deadwood_points - flip_penalty_points
             self.score_breakdowns[player.user_id] = {
                 "opened_meld_points": opened_meld_points,
@@ -451,14 +453,21 @@ def is_valid_meld(cards: list[RummyCard]) -> bool:
     if not normal_cards:
         return False
     if len({card.rank for card in normal_cards}) == 1:
-        return True
+        return not jokers or normal_cards[0].rank in NUMBER_RANKS
     if len({card.suit for card in normal_cards}) != 1:
         return False
-    ranks = sorted(card.rank_value for card in normal_cards)
-    if len(set(ranks)) != len(ranks):
+    rank_values = {card.rank_value for card in normal_cards}
+    if len(rank_values) != len(normal_cards):
         return False
-    missing = sum(right - left - 1 for left, right in zip(ranks, ranks[1:]))
-    return missing <= jokers
+    if not jokers:
+        ranks = sorted(rank_values)
+        return all(right - left == 1 for left, right in zip(ranks, ranks[1:]))
+    for start in range(0, len(RANKS) - len(cards) + 1):
+        run_values = set(range(start, start + len(cards)))
+        missing_values = run_values - rank_values
+        if rank_values <= run_values and len(missing_values) == jokers and missing_values <= NUMBER_RANK_VALUES:
+            return True
+    return False
 
 
 def can_partition_into_melds(cards: list[RummyCard]) -> bool:
