@@ -7,6 +7,26 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.15",
+        "title": "Koreksi pemicu penalti flip card Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Membatasi flip card hanya saat pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai closed card pada giliran yang sama.",
+            "Menghapus penalti flip dari closed card mandiri dan dari histori meld bukti pada giliran sebelumnya.",
+            "Menerapkan penalti kepada pemilik kartu target serta pemilik kartu di atas target yang ikut terambil saat flip card.",
+        ],
+    },
+    {
+        "version": "1.1.14",
+        "title": "Urutan giliran tournament Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Mengacak pemain awal ronde pertama tournament Rummy dengan arah searah jarum jam.",
+            "Memulai ronde tournament berikutnya dari pemain dengan skor kumulatif terendah.",
+            "Mengubah arah ronde tournament berikutnya menjadi berlawanan arah jarum jam jika ronde sebelumnya menghasilkan penalti flip.",
+        ],
+    },
+    {
         "version": "1.1.13",
         "title": "Penalti flip tunggal dan batas joker Rummy",
         "date": "2026-06-02",

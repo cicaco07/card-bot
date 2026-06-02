@@ -24,7 +24,7 @@ def test_rummy_lobby_and_playing_text() -> None:
     session.game.deck = [RummyCard("4", "diamonds")]
     session.log = ["Game dimulai."]
     assert rummy_state_text(session) == (
-        "**Rummy: Game Berjalan**\nGilirannya: <@1>\nFase giliran: **ambil kartu**\n"
+        "**Rummy: Game Berjalan**\nGilirannya: <@1>\nArah giliran: **searah jarum jam**\nFase giliran: **ambil kartu**\n"
         "Kewajiban meld buangan: **Tidak ada**\n"
         "Sisa deck: **1 kartu**\nKartu buangan teratas: **Belum ada**\nTotal buangan: 0\n"
         "3 buangan teratas:\n- Belum ada\n\n"
@@ -97,6 +97,6 @@ def test_rummy_finished_text_shows_score_breakdown() -> None:
     assert "Meld terbuka: +30 point -> (J ♥️, Q ♥️, K ♥️)" in text
     assert "Meld tertutup: +15 point -> (3 ♣️, 4 ♣️, 5 ♣️)" in text
     assert "Deadwood: -5 point -> 9 ♦️" in text
-    assert "Penalti flip: -50 point -> 2 ♠️ sebagai closed card; asal buangan yang pernah dijadikan meld bukti: J ♣️" in text
+    assert "Penalti flip: -50 point -> 2 ♠️ sebagai flip card; buangan yang terambil pada giliran penutup: J ♣️" in text
     assert "Total: -10 point" in text
     assert "Penalti flip card:\n- <@1>: J ♣️" in text

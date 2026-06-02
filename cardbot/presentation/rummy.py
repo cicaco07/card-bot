@@ -65,6 +65,7 @@ def rummy_state_text(session: RummySession) -> str:
     return (
         "**Rummy: Game Berjalan**\n"
         f"{tournament}Gilirannya: {mention(state['current_player_id'])}\n"
+        f"Arah giliran: **{state['direction']}**\n"
         f"Fase giliran: **{state['phase']}**\n"
         f"Kewajiban meld buangan: **{required_meld}**\n"
         f"Sisa deck: **{state['deck_count']} kartu**\n"
@@ -128,7 +129,8 @@ def rummy_rules_embed() -> discord.Embed:
     embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Pilih target lalu tekan Konfirmasi Ambil. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
     embed.add_field(name="Rule Ace", value="Ace dari buangan belum boleh diambil dan Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld miliknya sendiri yang tidak memakai Ace.", inline=False)
     embed.add_field(name="Closed Card", value="Kartu terakhir boleh dipakai sebagai closed card untuk langsung mengakhiri ronde. Jika masih ada kartu lain, semuanya wajib sudah dapat menjadi meld.", inline=False)
-    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Jika buangan seorang pemain pernah dijadikan target meld bukti, pemain tersebut mendapat satu penalti saat closed card: angka -50, J/Q/K -100, Ace -150, joker -250. Penalti tidak ditampilkan sebelum ronde selesai dan tidak berlaku tanpa closed card.", inline=False)
+    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Flip card hanya terjadi jika pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai closed card pada giliran yang sama. Pemilik target buangan dan kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Nilai penalti mengikuti kartu closed card.", inline=False)
+    embed.add_field(name="Tournament", value="Ronde pertama memilih pemain awal secara acak dan berjalan searah jarum jam. Ronde berikutnya dimulai dari pemain dengan skor kumulatif terendah. Jika ronde sebelumnya menghasilkan penalti flip, arah ronde berikutnya menjadi berlawanan arah jarum jam.", inline=False)
     return embed
 
 
@@ -171,8 +173,8 @@ def _flip_penalty_text(details: dict[str, object]) -> str:
     penalty_card = details["flip_penalty_card"]
     origins = _cards_text(flip_cards)
     if penalty_card is None:
-        return f"tidak diterapkan tanpa closed card; asal buangan yang pernah dijadikan meld bukti: {origins}"
-    return f"{penalty_card} sebagai closed card; asal buangan yang pernah dijadikan meld bukti: {origins}"
+        return f"tidak diterapkan tanpa flip card; buangan yang terambil pada giliran penutup: {origins}"
+    return f"{penalty_card} sebagai flip card; buangan yang terambil pada giliran penutup: {origins}"
 
 
 def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_numbers: set[int] | None = None) -> str:

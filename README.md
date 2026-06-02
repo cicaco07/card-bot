@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.13`
+Versi saat ini: `1.1.15`
 
 Command changelog:
 
@@ -296,10 +296,14 @@ Rules utama:
 - Tombol **Closed Card** mengakhiri ronde. Kartu terakhir boleh langsung dipakai sebagai closed card; jika masih ada kartu lain, semuanya wajib dapat menjadi meld.
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
-- Jika buangan seorang pemain pernah dijadikan target meld bukti, pemain tersebut mendapat maksimal satu penalti saat pemain lain melakukan **Closed Card**: angka -50, J/Q/K -100, Ace -150, joker -250. Penalti mengikuti kartu penutup, tidak ditampilkan selama ronde berjalan, dan tidak berlaku jika ronde selesai tanpa **Closed Card**.
+- Flip card hanya terjadi jika dalam satu giliran pemain mengambil kartu buangan, menurunkan meld bukti, menyisakan tepat satu kartu, lalu memakai kartu terakhir tersebut sebagai **Closed Card**. Closed card mandiri di luar skenario ini tidak memberi penalti flip.
+- Saat flip card terjadi, pemilik kartu target dan pemilik setiap kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Nilai penalti mengikuti kartu **Closed Card**.
 - Hasil akhir ronde menampilkan rincian kartu pada meld terbuka, meld tertutup, deadwood, penalti flip, dan total skor normal.
 - Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
 - Mode tournament mengakumulasi skor selama 3-20 ronde.
+- Pada ronde pertama tournament, pemain awal dipilih acak dan giliran berjalan searah jarum jam.
+- Ronde tournament berikutnya dimulai dari pemain dengan skor kumulatif terendah. Jika seri, pemain awal dipilih acak di antara skor terendah.
+- Jika ronde sebelumnya menghasilkan penalti flip, arah ronde tournament berikutnya menjadi berlawanan arah jarum jam.
 
 Panel Rummy memakai tombol:
 

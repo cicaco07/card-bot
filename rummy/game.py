@@ -53,14 +53,15 @@ class RummyGame:
         self.discard_pile: list[RummyCard] = []
         self.discarded_by_user_ids: list[int | None] = []
         self.turn_index = 0
+        self.turn_direction = 1
         self.awaiting_discard_user_id: int | None = None
         self.last_draw_source: str | None = None
         self.required_discard_meld_card: RummyCard | None = None
         self.required_discard_meld_hand_cards: tuple[RummyCard, ...] = ()
         self.required_discard_meld_size: int | None = None
-        self.required_discard_meld_discarder_user_id: int | None = None
         self.scores: dict[int, int] = {}
         self.score_breakdowns: dict[int, dict[str, object]] = {}
+        self.pending_flip_source_cards_by_user_id: dict[int, list[RummyCard]] = {}
         self.flip_source_cards_by_user_id: dict[int, list[RummyCard]] = {}
         self.closed_user_id: int | None = None
         self.closed_card: RummyCard | None = None
@@ -74,11 +75,15 @@ class RummyGame:
             raise RummyGameError(f"Lobby penuh. Maksimal {self.max_players} pemain.")
         self.players.append(RummyPlayer(user_id, name))
 
-    def start(self) -> list[str]:
+    def start(self, starting_user_id: int | None = None, turn_direction: int = 1) -> list[str]:
         if self.status != RummyStatus.WAITING:
             raise RummyGameError("Game ini sudah dimulai.")
         if len(self.players) < self.min_players:
             raise RummyGameError(f"Butuh minimal {self.min_players} pemain untuk mulai.")
+        if turn_direction not in {-1, 1}:
+            raise RummyGameError("Arah giliran Rummy tidak valid.")
+        if starting_user_id is not None and self.get_player(starting_user_id) is None:
+            raise RummyGameError("Pemain awal Rummy tidak tersedia.")
 
         self.deck = self._build_deck()
         random.shuffle(self.deck)
@@ -88,15 +93,19 @@ class RummyGame:
             player.opened_melds = []
         self.discard_pile = []
         self.discarded_by_user_ids = []
-        self.turn_index = 0
+        self.turn_index = next(
+            (index for index, player in enumerate(self.players) if player.user_id == starting_user_id),
+            0,
+        )
+        self.turn_direction = turn_direction
         self.awaiting_discard_user_id = None
         self.last_draw_source = None
         self.required_discard_meld_card = None
         self.required_discard_meld_hand_cards = ()
         self.required_discard_meld_size = None
-        self.required_discard_meld_discarder_user_id = None
         self.scores = {}
         self.score_breakdowns = {}
+        self.pending_flip_source_cards_by_user_id = {}
         self.flip_source_cards_by_user_id = {}
         self.closed_user_id = None
         self.closed_card = None
@@ -128,6 +137,7 @@ class RummyGame:
 
     def draw_from_deck(self, user_id: int) -> RummyActionResult:
         self._ensure_draw_turn(user_id)
+        self._clear_pending_flip_sources()
         if not self.deck:
             return self._finish("Deck habis. Perhitungan skor dimulai.")
         player = self.current_player
@@ -144,8 +154,8 @@ class RummyGame:
             raise RummyGameError("Kartu buangan itu tidak tersedia dalam batas 3 kartu teratas.")
         player = self.current_player
         target_card = discards[depth - 1]
-        target_discarder_user_id = self.discarded_by_user_ids[-depth] if len(self.discarded_by_user_ids) >= depth else None
         picked_cards = self.discard_pile[-depth:]
+        picked_discarder_user_ids = self.discarded_by_user_ids[-depth:]
         if any(card.rank == "A" for card in picked_cards) and not self._has_non_ace_opened_meld(player):
             raise RummyGameError(
                 "Ace dari buangan hanya boleh diambil setelah kamu menurunkan minimal satu meld milikmu yang tidak memakai Ace."
@@ -166,7 +176,10 @@ class RummyGame:
         self.required_discard_meld_card = target_card
         self.required_discard_meld_hand_cards = original_hand
         self.required_discard_meld_size = required_meld_size
-        self.required_discard_meld_discarder_user_id = target_discarder_user_id
+        self.pending_flip_source_cards_by_user_id = {}
+        for card, discarder_user_id in zip(picked_cards, picked_discarder_user_ids):
+            if discarder_user_id is not None:
+                self.pending_flip_source_cards_by_user_id.setdefault(discarder_user_id, []).append(card)
         return RummyActionResult([
             f"{player.name} mengambil {depth} kartu dari buangan dengan target {target_card.activity_label}.",
             f"{player.name} wajib menurunkan meld bukti minimal {required_meld_size} kartu yang memakai "
@@ -205,11 +218,7 @@ class RummyGame:
             self.required_discard_meld_card = None
             self.required_discard_meld_hand_cards = ()
             self.required_discard_meld_size = None
-            target_discarder = self.get_player(self.required_discard_meld_discarder_user_id)
-            self.required_discard_meld_discarder_user_id = None
             messages = [f"{player.name} menurunkan meld bukti dan menguncinya: {meld_text}."]
-            if target_discarder is not None:
-                self.flip_source_cards_by_user_id.setdefault(target_discarder.user_id, []).append(required_card)
         else:
             messages = [f"{player.name} menurunkan meld dan menguncinya: {meld_text}."]
         if not player.hand:
@@ -277,11 +286,18 @@ class RummyGame:
         self.last_draw_source = None
 
         if close:
+            self.flip_source_cards_by_user_id = (
+                {user_id: list(cards) for user_id, cards in self.pending_flip_source_cards_by_user_id.items()}
+                if not player.hand
+                else {}
+            )
+            self._clear_pending_flip_sources()
             self.closed_user_id = user_id
             self.closed_card = card
             return self._finish(
                 f"{player.name} closed card dengan {card.activity_label}.",
             )
+        self._clear_pending_flip_sources()
         if not player.hand:
             return self._complete_empty_hand_turn(
                 f"{player.name} menghabiskan seluruh kartu dengan membuang {card.activity_label}.",
@@ -304,6 +320,7 @@ class RummyGame:
         return {
             "status": self.status.value,
             "current_player_id": current_player_id,
+            "direction": "searah jarum jam" if self.turn_direction == 1 else "berlawanan arah jarum jam",
             "phase": "buang kartu" if self.awaiting_discard_user_id is not None else "ambil kartu",
             "required_discard_meld_card": self.required_discard_meld_card.activity_label if self.required_discard_meld_card else None,
             "required_discard_meld_size": self.required_discard_meld_size,
@@ -337,7 +354,7 @@ class RummyGame:
         self.required_discard_meld_card = None
         self.required_discard_meld_hand_cards = ()
         self.required_discard_meld_size = None
-        self.required_discard_meld_discarder_user_id = None
+        self._clear_pending_flip_sources()
         self.score_breakdowns = {}
         for player in self.players:
             hand_melds, deadwood_cards = score_hand_details(player.hand)
@@ -367,6 +384,7 @@ class RummyGame:
     def _complete_empty_hand_turn(self, message: str) -> RummyActionResult:
         self.awaiting_discard_user_id = None
         self.last_draw_source = None
+        self._clear_pending_flip_sources()
         if not self.deck:
             return self._finish(f"{message} Deck habis. Perhitungan skor dimulai.")
         if not any(other.hand for other in self.players):
@@ -376,11 +394,18 @@ class RummyGame:
 
     def _advance_to_next_player_with_cards(self) -> RummyPlayer:
         for offset in range(1, len(self.players) + 1):
-            next_index = (self.turn_index + offset) % len(self.players)
+            next_index = (self.turn_index + (offset * self.turn_direction)) % len(self.players)
             if self.players[next_index].hand:
                 self.turn_index = next_index
                 return self.players[next_index]
         raise RummyGameError("Tidak ada pemain dengan kartu tersisa.")
+
+    @property
+    def has_flip_penalty(self) -> bool:
+        return self.closed_card is not None and any(self.flip_source_cards_by_user_id.values())
+
+    def _clear_pending_flip_sources(self) -> None:
+        self.pending_flip_source_cards_by_user_id = {}
 
     def _ensure_required_discard_meld_completed(self) -> None:
         if self.required_discard_meld_card is not None:
