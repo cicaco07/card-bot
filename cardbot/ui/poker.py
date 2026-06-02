@@ -10,30 +10,38 @@ from poker.game import PokerGameError, PokerStatus
 
 from ..presentation.poker import poker_hand_text, poker_hand_visuals, poker_table_text, poker_table_visuals
 from ..sessions import PokerSession, finalize_poker_round_if_needed, get_poker_session, require_poker_player
-from ..state import get_client, poker_sessions_by_channel
+from ..state import get_client, register_poker_session, unregister_poker_session
 from ..timer import cancel_poker_turn_timer, schedule_poker_turn_timer as _schedule_poker_turn_timer
+from ..tournaments import (
+    TournamentPersistenceError,
+    checkpoint_session_if_needed,
+    get_tournament_service,
+    update_panel_if_persisted,
+)
 from .common import reply_error
 from .log_utils import add_action_log
 
 
 def poker_table_view(session: PokerSession) -> discord.ui.View:
     if session.game.status == PokerStatus.WAITING:
-        return PokerLobbyView(session.channel_id)
+        return PokerLobbyView(session.runtime_key)
     if session.tournament_between_rounds:
-        return PokerTournamentRoundFinishedView(session.channel_id)
+        return PokerTournamentRoundFinishedView(session.runtime_key)
     if session.game.status == PokerStatus.FINISHED:
-        return PokerFinishedView(session.channel_id)
-    return PokerGameView(session.channel_id)
+        return PokerFinishedView(session.runtime_key)
+    return PokerGameView(session.runtime_key)
 
 
 async def refresh_poker_table_message(session: PokerSession) -> None:
     finalize_poker_round_if_needed(session)
+    await checkpoint_session_if_needed(session)
     await repost_poker_table_message(session)
     schedule_poker_turn_timer(session)
 
 
 async def repost_poker_table_message(session: PokerSession) -> None:
     finalize_poker_round_if_needed(session)
+    await checkpoint_session_if_needed(session)
     channel = get_client().get_channel(session.channel_id)
     if not hasattr(channel, "send"):
         return
@@ -47,6 +55,7 @@ async def repost_poker_table_message(session: PokerSession) -> None:
         files=files,
     )
     session.table_message_id = message.id
+    await update_panel_if_persisted(session)
 
     if old_message_id is not None:
         await delete_poker_table_message(session, old_message_id)
@@ -90,6 +99,63 @@ def add_poker_result_log(session: PokerSession, messages: list[str]) -> None:
     add_action_log(session, messages)
 
 
+async def _sync_poker_lobby(session: PokerSession) -> None:
+    if not session.table_id:
+        return
+    try:
+        await get_tournament_service().sync_lobby(session)
+    except TournamentPersistenceError as error:
+        raise PokerGameError(str(error)) from error
+
+
+async def _archive_poker_table(session: PokerSession) -> None:
+    if not session.table_code or session.guild_id is None:
+        return
+    try:
+        await get_tournament_service().archive_table(session.guild_id, session.table_code)
+    except TournamentPersistenceError as error:
+        raise PokerGameError(str(error)) from error
+
+
+def _require_poker_checkpoint_saved(session: PokerSession) -> None:
+    if (
+        session.table_id
+        and session.tournament_current_round in session.tournament_scored_rounds
+        and session.tournament_current_round not in session.tournament_checkpointed_rounds
+    ):
+        raise PokerGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum membuat lobby baru.")
+
+
+async def _change_poker_mode(session: PokerSession, interaction: discord.Interaction, target_mode: str) -> None:
+    if target_mode == session.mode:
+        return
+    if target_mode == "tournament":
+        if interaction.guild_id is None:
+            raise PokerGameError("Tournament persistent hanya bisa dibuat di server Discord.")
+        unregister_poker_session(session)
+        session.mode = target_mode
+        try:
+            await get_tournament_service().create_table(session, guild_id=interaction.guild_id, game_type="poker")
+        except TournamentPersistenceError as error:
+            session.mode = "regular"
+            session.guild_id = None
+            session.table_id = None
+            session.table_code = None
+            register_poker_session(session)
+            raise PokerGameError(str(error)) from error
+        register_poker_session(session)
+        return
+
+    await _archive_poker_table(session)
+    unregister_poker_session(session)
+    session.mode = "regular"
+    session.guild_id = None
+    session.table_id = None
+    session.table_code = None
+    session.table_name = None
+    register_poker_session(session)
+
+
 class PokerTimerSelect(discord.ui.Select):
     def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
@@ -111,6 +177,7 @@ class PokerTimerSelect(discord.ui.Select):
             if session.game.status != PokerStatus.WAITING:
                 raise PokerGameError("Timer hanya bisa diubah saat lobby belum mulai.")
             session.timer_seconds = int(self.values[0])
+            await _sync_poker_lobby(session)
             session.add_log(f"Timer auto-pass diatur ke {session.timer_seconds} detik.")
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
@@ -148,8 +215,7 @@ class PokerModeSelect(discord.ui.Select):
             require_poker_player(session, interaction.user.id)
             if session.game.status != PokerStatus.WAITING:
                 raise PokerGameError("Mode hanya bisa diubah saat lobby belum mulai.")
-
-            session.mode = self.values[0]
+            await _change_poker_mode(session, interaction, self.values[0])
             if session.is_tournament:
                 session.tournament_total_rounds = max(3, session.tournament_total_rounds)
                 session.add_log("Mode diubah ke Tournament.")
@@ -157,7 +223,9 @@ class PokerModeSelect(discord.ui.Select):
                 session.tournament_current_round = 0
                 session.tournament_scores.clear()
                 session.tournament_round_summaries.clear()
+                session.tournament_round_points.clear()
                 session.tournament_scored_rounds.clear()
+                session.tournament_checkpointed_rounds.clear()
                 session.tournament_aborted = False
                 session.add_log("Mode diubah ke Regular.")
             await update_poker_table_from_interaction(interaction, session)
@@ -192,6 +260,7 @@ class PokerTournamentRoundSelect(discord.ui.Select):
             if session.game.status != PokerStatus.WAITING:
                 raise PokerGameError("Jumlah ronde hanya bisa diubah saat lobby belum mulai.")
             session.tournament_total_rounds = int(self.values[0])
+            await _sync_poker_lobby(session)
             session.add_log(f"Jumlah ronde tournament diatur ke {session.tournament_total_rounds}.")
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
@@ -202,7 +271,7 @@ class PokerLobbyView(discord.ui.View):
     def __init__(self, channel_id: int) -> None:
         super().__init__(timeout=None)
         self.channel_id = channel_id
-        session = poker_sessions_by_channel.get(channel_id)
+        session = get_poker_session(channel_id)
         self.add_item(PokerModeSelect(channel_id))
         self.add_item(PokerTimerSelect(channel_id))
         if session and session.is_tournament:
@@ -221,6 +290,11 @@ class PokerLobbyView(discord.ui.View):
         try:
             session = get_poker_session(self.channel_id)
             session.game.add_player(interaction.user.id, interaction.user.display_name)
+            try:
+                await _sync_poker_lobby(session)
+            except PokerGameError:
+                session.game.players = [player for player in session.game.players if player.user_id != interaction.user.id]
+                raise
             session.add_log(f"{interaction.user.display_name} masuk lobby.")
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
@@ -230,6 +304,7 @@ class PokerLobbyView(discord.ui.View):
     async def begin_game(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_poker_session(self.channel_id)
+            await _sync_poker_lobby(session)
             messages = session.start_poker_round()
             session.add_log(messages)
             await update_poker_table_from_interaction(interaction, session)
@@ -241,7 +316,8 @@ class PokerLobbyView(discord.ui.View):
         try:
             session = get_poker_session(self.channel_id)
             require_poker_player(session, interaction.user.id)
-            poker_sessions_by_channel.pop(self.channel_id, None)
+            await _archive_poker_table(session)
+            unregister_poker_session(session)
             cancel_poker_turn_timer(session)
             if not interaction.response.is_done():
                 await interaction.response.defer()
@@ -272,14 +348,24 @@ class PokerFinishedView(discord.ui.View):
     @discord.ui.button(label="Buat Lobby Baru", style=discord.ButtonStyle.success)
     async def new_lobby(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
-            session = PokerSession(channel_id=self.channel_id, owner_id=interaction.user.id)
+            old_session = get_poker_session(self.channel_id)
+            _require_poker_checkpoint_saved(old_session)
+            session = PokerSession(channel_id=old_session.channel_id, owner_id=interaction.user.id)
             session.game.add_player(interaction.user.id, interaction.user.display_name)
             session.add_log(f"Lobby baru dibuat oleh {interaction.user.display_name}.")
-            old_session = poker_sessions_by_channel.get(self.channel_id)
-            if old_session:
-                cancel_poker_turn_timer(old_session)
-                session.table_message_id = old_session.table_message_id
-            poker_sessions_by_channel[self.channel_id] = session
+            cancel_poker_turn_timer(old_session)
+            session.table_message_id = old_session.table_message_id
+            unregister_poker_session(old_session)
+            register_poker_session(session)
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Coba Simpan Checkpoint", style=discord.ButtonStyle.secondary)
+    async def retry_checkpoint(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            require_poker_player(session, interaction.user.id)
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
             await reply_error(interaction, error)
@@ -318,9 +404,19 @@ class PokerTournamentRoundFinishedView(discord.ui.View):
             if approved:
                 session.tournament_aborted = True
                 session.end_game_votes.clear()
+                await _archive_poker_table(session)
                 session.add_log(f"Vote end tournament disetujui {votes}/{required}. Tournament dihentikan.")
             else:
                 session.add_log(f"{interaction.user.display_name} vote end tournament ({votes}/{required}).")
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Coba Simpan Checkpoint", style=discord.ButtonStyle.secondary)
+    async def retry_checkpoint(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            require_poker_player(session, interaction.user.id)
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
             await reply_error(interaction, error)
@@ -383,6 +479,7 @@ class PokerGameView(discord.ui.View):
                 session.game.status = PokerStatus.FINISHED
                 if session.is_tournament:
                     session.tournament_aborted = True
+                    await _archive_poker_table(session)
                 session.end_game_votes.clear()
                 label = "Tournament" if session.is_tournament else "Game"
                 session.add_log(f"Vote end game disetujui {votes}/{required}. {label} diakhiri.")

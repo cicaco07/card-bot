@@ -22,17 +22,26 @@ from .changelog import (
 )
 from .client import bot, tree
 from .constants import APP_VERSION, COLOR_CHOICES, POKER_MODE_CHOICES, RUMMY_MODE_CHOICES
+from .database import initialize_database
 from .presentation.poker import poker_hand_text, poker_hand_visuals, poker_table_text, poker_table_visuals
 from .presentation.rummy import rummy_hand_text, rummy_hand_visuals, rummy_table_text, rummy_table_visuals
 from .presentation.uno import hand_text, hand_visuals, table_text, table_visuals
-from .sessions import PokerSession, RummySession, UnoSession, get_poker_session, get_rummy_session, get_session, require_channel_id
+from .sessions import PokerSession, RummySession, UnoSession, find_poker_session, find_rummy_session, get_session, require_channel_id
 from .state import (
     changelog_seen_versions_by_user,
     poker_sessions_by_channel,
+    poker_tournament_sessions_by_id,
     published_changelog_versions_by_channel,
+    register_poker_session,
+    register_rummy_session,
     rummy_sessions_by_channel,
+    rummy_tournament_sessions_by_id,
     sessions_by_channel,
+    unregister_poker_session,
+    unregister_rummy_session,
 )
+from .timer import cancel_poker_turn_timer
+from .tournaments import TournamentPersistenceError, get_tournament_service, resume_session, update_panel_if_persisted
 from .ui.common import reply_error
 from .ui.poker import PokerHandView, poker_table_view, refresh_poker_table_message
 from .ui.rummy import RummyHandView, refresh_rummy_table_message, rummy_table_view
@@ -40,6 +49,10 @@ from .ui.uno import HandView, add_result_log, refresh_table_message, table_view
 
 
 commands_synced = False
+TOURNAMENT_GAME_CHOICES = [
+    app_commands.Choice(name="Poker", value="poker"),
+    app_commands.Choice(name="Rummy", value="rummy"),
+]
 
 
 async def _published_changelog_versions(destination: discord.TextChannel) -> set[str]:
@@ -62,6 +75,7 @@ async def on_ready() -> None:
         print(f"Bot logged in as {bot.user}.")
         return
 
+    await initialize_database()
     guild_id = os.getenv("DISCORD_GUILD_ID")
     if guild_id:
         guild = discord.Object(id=int(guild_id))
@@ -306,17 +320,19 @@ async def uno_play(
 @app_commands.describe(
     mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
     rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+    table_name="Nama meja tournament agar mudah dibedakan.",
 )
 @app_commands.choices(mode=POKER_MODE_CHOICES)
 async def poker_start(
     interaction: discord.Interaction,
     mode: str = "regular",
     rounds: app_commands.Range[int, 3, 20] = 3,
+    table_name: str | None = None,
 ) -> None:
     try:
         channel_id = require_channel_id(interaction)
         existing = poker_sessions_by_channel.get(channel_id)
-        if existing and (existing.game.status != PokerStatus.FINISHED or existing.tournament_between_rounds):
+        if mode == "regular" and existing and existing.game.status != PokerStatus.FINISHED:
             raise PokerGameError("Sudah ada meja Remi Poker aktif di channel ini.")
 
         session = PokerSession(
@@ -326,9 +342,18 @@ async def poker_start(
             tournament_total_rounds=rounds,
         )
         session.game.add_player(interaction.user.id, interaction.user.display_name)
+        if session.is_tournament:
+            if interaction.guild_id is None:
+                raise PokerGameError("Tournament persistent hanya bisa dibuat di server Discord.")
+            await get_tournament_service().create_table(
+                session,
+                guild_id=interaction.guild_id,
+                game_type="poker",
+                table_name=table_name,
+            )
         mode_label = "Tournament" if session.is_tournament else "Regular"
         session.add_log(f"Lobby {mode_label} dibuat oleh {interaction.user.display_name}.")
-        poker_sessions_by_channel[channel_id] = session
+        register_poker_session(session)
 
         embed, files = poker_table_visuals(session)
         await interaction.response.send_message(
@@ -339,14 +364,16 @@ async def poker_start(
         )
         message = await interaction.original_response()
         session.table_message_id = message.id
-    except PokerGameError as error:
+        await update_panel_if_persisted(session)
+    except (PokerGameError, TournamentPersistenceError) as error:
         await reply_error(interaction, error)
 
 
 @tree.command(name="poker-hand", description="Fallback: lihat kartu Remi Poker tanganmu secara private.")
-async def poker_hand(interaction: discord.Interaction) -> None:
+@app_commands.describe(table_code="Kode meja jika ada beberapa Poker tournament di channel ini.")
+async def poker_hand(interaction: discord.Interaction, table_code: str | None = None) -> None:
     try:
-        session = get_poker_session(interaction.channel_id)
+        session = find_poker_session(interaction.channel_id, interaction.guild_id, table_code)
         session.game.hand_for(interaction.user.id)
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed, files = await asyncio.to_thread(poker_hand_visuals, session.game, interaction.user.id)
@@ -354,7 +381,7 @@ async def poker_hand(interaction: discord.Interaction) -> None:
             poker_hand_text(session.game, interaction.user.id),
             embed=embed,
             files=files,
-            view=PokerHandView(session.channel_id, interaction.user.id),
+            view=PokerHandView(session.runtime_key, interaction.user.id),
             ephemeral=True,
         )
     except PokerGameError as error:
@@ -362,9 +389,10 @@ async def poker_hand(interaction: discord.Interaction) -> None:
 
 
 @tree.command(name="poker-status", description="Fallback: refresh status meja Remi Poker.")
-async def poker_status(interaction: discord.Interaction) -> None:
+@app_commands.describe(table_code="Kode meja jika ada beberapa Poker tournament di channel ini.")
+async def poker_status(interaction: discord.Interaction, table_code: str | None = None) -> None:
     try:
-        session = get_poker_session(interaction.channel_id)
+        session = find_poker_session(interaction.channel_id, interaction.guild_id, table_code)
         await refresh_poker_table_message(session)
         await interaction.response.send_message("Meja Remi Poker direfresh.", ephemeral=True)
     except PokerGameError as error:
@@ -375,39 +403,52 @@ async def poker_status(interaction: discord.Interaction) -> None:
 @app_commands.describe(
     mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
     rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+    table_name="Nama meja tournament agar mudah dibedakan.",
 )
 @app_commands.choices(mode=RUMMY_MODE_CHOICES)
 async def rummy_start(
     interaction: discord.Interaction,
     mode: str = "regular",
     rounds: app_commands.Range[int, 3, 20] = 3,
+    table_name: str | None = None,
 ) -> None:
     try:
         channel_id = require_channel_id(interaction)
         existing = rummy_sessions_by_channel.get(channel_id)
-        if existing and (existing.game.status != RummyStatus.FINISHED or existing.tournament_between_rounds):
+        if mode == "regular" and existing and existing.game.status != RummyStatus.FINISHED:
             raise RummyGameError("Sudah ada meja Rummy aktif di channel ini.")
         session = RummySession(channel_id, interaction.user.id, mode=mode, tournament_total_rounds=rounds)
         session.game.add_player(interaction.user.id, interaction.user.display_name)
+        if session.is_tournament:
+            if interaction.guild_id is None:
+                raise RummyGameError("Tournament persistent hanya bisa dibuat di server Discord.")
+            await get_tournament_service().create_table(
+                session,
+                guild_id=interaction.guild_id,
+                game_type="rummy",
+                table_name=table_name,
+            )
         session.add_log(f"Lobby Rummy dibuat oleh {interaction.user.display_name}.")
-        rummy_sessions_by_channel[channel_id] = session
+        register_rummy_session(session)
         embed, files = rummy_table_visuals(session)
         await interaction.response.send_message(rummy_table_text(session), embed=embed, files=files, view=rummy_table_view(session))
         session.table_message_id = (await interaction.original_response()).id
-    except RummyGameError as error:
+        await update_panel_if_persisted(session)
+    except (RummyGameError, TournamentPersistenceError) as error:
         await reply_error(interaction, error)
 
 
 @tree.command(name="rummy-hand", description="Fallback: lihat kartu Rummy tanganmu secara private.")
-async def rummy_hand(interaction: discord.Interaction) -> None:
+@app_commands.describe(table_code="Kode meja jika ada beberapa Rummy tournament di channel ini.")
+async def rummy_hand(interaction: discord.Interaction, table_code: str | None = None) -> None:
     try:
-        session = get_rummy_session(interaction.channel_id)
+        session = find_rummy_session(interaction.channel_id, interaction.guild_id, table_code)
         embed, files = await asyncio.to_thread(rummy_hand_visuals, session.game, interaction.user.id)
         await interaction.response.send_message(
             rummy_hand_text(session.game, interaction.user.id),
             embed=embed,
             files=files,
-            view=RummyHandView(session.channel_id, interaction.user.id),
+            view=RummyHandView(session.runtime_key, interaction.user.id),
             ephemeral=True,
         )
     except RummyGameError as error:
@@ -415,10 +456,97 @@ async def rummy_hand(interaction: discord.Interaction) -> None:
 
 
 @tree.command(name="rummy-status", description="Fallback: refresh status meja Rummy.")
-async def rummy_status(interaction: discord.Interaction) -> None:
+@app_commands.describe(table_code="Kode meja jika ada beberapa Rummy tournament di channel ini.")
+async def rummy_status(interaction: discord.Interaction, table_code: str | None = None) -> None:
     try:
-        session = get_rummy_session(interaction.channel_id)
+        session = find_rummy_session(interaction.channel_id, interaction.guild_id, table_code)
         await refresh_rummy_table_message(session)
         await interaction.response.send_message("Meja Rummy direfresh.", ephemeral=True)
     except RummyGameError as error:
         await reply_error(interaction, error)
+
+
+@tree.command(name="tournament-list", description="Lihat meja tournament persistent aktif di server ini.")
+@app_commands.describe(mode="Filter mode tournament.")
+@app_commands.choices(mode=TOURNAMENT_GAME_CHOICES)
+async def tournament_list(interaction: discord.Interaction, mode: str | None = None) -> None:
+    try:
+        if interaction.guild_id is None:
+            raise TournamentPersistenceError("Command ini hanya bisa dipakai di server Discord.")
+        tables = await get_tournament_service().list_tables(interaction.guild_id, mode)
+        if not tables:
+            await interaction.response.send_message("Belum ada meja tournament persistent aktif.", ephemeral=True)
+            return
+        rows = []
+        for table in tables:
+            checkpoint = (
+                f"checkpoint ronde {table.completed_rounds}/{table.total_rounds}"
+                if table.completed_rounds
+                else "belum memiliki checkpoint resume"
+            )
+            name = f" - {table.table_name}" if table.table_name else ""
+            rows.append(f"- `{table.table_code}` **{table.game_type.title()}**{name}: {checkpoint}")
+        await interaction.response.send_message("**Meja Tournament Aktif**\n" + "\n".join(rows), ephemeral=True)
+    except TournamentPersistenceError as error:
+        await reply_error(interaction, error)
+
+
+@tree.command(name="tournament-resume", description="Buka kembali panel tournament dari checkpoint akhir ronde.")
+@app_commands.describe(table_code="Kode meja tournament dari /tournament-list.")
+async def tournament_resume(interaction: discord.Interaction, table_code: str) -> None:
+    try:
+        channel_id = require_channel_id(interaction)
+        if interaction.guild_id is None:
+            raise TournamentPersistenceError("Command ini hanya bisa dipakai di server Discord.")
+        table = await get_tournament_service().load_table(interaction.guild_id, table_code)
+        if interaction.user.id not in {player.user_id for player in table.players} and not _can_manage_guild(interaction):
+            raise TournamentPersistenceError("Hanya pemain meja atau user dengan permission Manage Server yang dapat me-resume.")
+        if table.table_id in poker_tournament_sessions_by_id or table.table_id in rummy_tournament_sessions_by_id:
+            raise TournamentPersistenceError("Meja ini sudah aktif di memory bot. Gunakan panel yang terakhir dikirim.")
+
+        session = resume_session(table)
+        session.channel_id = channel_id
+        if isinstance(session, PokerSession):
+            register_poker_session(session)
+            embed, files = poker_table_visuals(session)
+            content = poker_table_text(session)
+            view = poker_table_view(session)
+        else:
+            register_rummy_session(session)
+            embed, files = rummy_table_visuals(session)
+            content = rummy_table_text(session)
+            view = rummy_table_view(session)
+        await interaction.response.send_message(content, embed=embed, files=files, view=view)
+        session.table_message_id = (await interaction.original_response()).id
+        await update_panel_if_persisted(session)
+    except (UnoGameError, TournamentPersistenceError) as error:
+        await reply_error(interaction, error)
+
+
+@tree.command(name="tournament-archive", description="Arsipkan meja tournament persistent.")
+@app_commands.describe(table_code="Kode meja tournament yang akan diarsipkan.")
+async def tournament_archive(interaction: discord.Interaction, table_code: str) -> None:
+    try:
+        if interaction.guild_id is None:
+            raise TournamentPersistenceError("Command ini hanya bisa dipakai di server Discord.")
+        table = await get_tournament_service().get_table(interaction.guild_id, table_code)
+        if table is None:
+            raise TournamentPersistenceError("Meja tournament tidak ditemukan di server ini.")
+        if interaction.user.id != table.owner_user_id and not _can_manage_guild(interaction):
+            raise TournamentPersistenceError("Hanya owner meja atau user dengan permission Manage Server yang dapat mengarsipkan.")
+        await get_tournament_service().archive_table(interaction.guild_id, table_code)
+        poker_session = poker_tournament_sessions_by_id.get(table.table_id)
+        if poker_session:
+            cancel_poker_turn_timer(poker_session)
+            unregister_poker_session(poker_session)
+        rummy_session = rummy_tournament_sessions_by_id.get(table.table_id)
+        if rummy_session:
+            unregister_rummy_session(rummy_session)
+        await interaction.response.send_message(f"Meja tournament `{table.table_code}` sudah diarsipkan.", ephemeral=True)
+    except TournamentPersistenceError as error:
+        await reply_error(interaction, error)
+
+
+def _can_manage_guild(interaction: discord.Interaction) -> bool:
+    permissions = getattr(interaction.user, "guild_permissions", None)
+    return bool(permissions and permissions.manage_guild)

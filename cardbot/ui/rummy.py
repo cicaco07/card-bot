@@ -10,28 +10,36 @@ from rummy.game import RummyGameError, RummyStatus
 
 from ..presentation.rummy import rummy_hand_text, rummy_hand_visuals, rummy_table_text, rummy_table_visuals
 from ..sessions import RummySession, finalize_rummy_round_if_needed, get_rummy_session, require_rummy_player
-from ..state import get_client, rummy_sessions_by_channel
+from ..state import get_client, register_rummy_session, unregister_rummy_session
+from ..tournaments import (
+    TournamentPersistenceError,
+    checkpoint_session_if_needed,
+    get_tournament_service,
+    update_panel_if_persisted,
+)
 from .common import reply_error
 from .log_utils import add_action_log
 
 
 def rummy_table_view(session: RummySession) -> discord.ui.View:
     if session.game.status == RummyStatus.WAITING:
-        return RummyLobbyView(session.channel_id)
+        return RummyLobbyView(session.runtime_key)
     if session.tournament_between_rounds:
-        return RummyTournamentRoundFinishedView(session.channel_id)
+        return RummyTournamentRoundFinishedView(session.runtime_key)
     if session.game.status == RummyStatus.FINISHED:
-        return RummyFinishedView(session.channel_id)
-    return RummyGameView(session.channel_id)
+        return RummyFinishedView(session.runtime_key)
+    return RummyGameView(session.runtime_key)
 
 
 async def refresh_rummy_table_message(session: RummySession) -> None:
     finalize_rummy_round_if_needed(session)
+    await checkpoint_session_if_needed(session)
     await repost_rummy_table_message(session)
 
 
 async def repost_rummy_table_message(session: RummySession) -> None:
     finalize_rummy_round_if_needed(session)
+    await checkpoint_session_if_needed(session)
     channel = get_client().get_channel(session.channel_id)
     if not hasattr(channel, "send"):
         return
@@ -39,6 +47,7 @@ async def repost_rummy_table_message(session: RummySession) -> None:
     embed, files = rummy_table_visuals(session)
     message = await channel.send(content=rummy_table_text(session), view=rummy_table_view(session), embed=embed, files=files)
     session.table_message_id = message.id
+    await update_panel_if_persisted(session)
     if old_message_id is not None:
         await delete_rummy_table_message(session, old_message_id)
 
@@ -59,6 +68,63 @@ async def update_rummy_table_from_interaction(interaction: discord.Interaction, 
     await refresh_rummy_table_message(session)
 
 
+async def _sync_rummy_lobby(session: RummySession) -> None:
+    if not session.table_id:
+        return
+    try:
+        await get_tournament_service().sync_lobby(session)
+    except TournamentPersistenceError as error:
+        raise RummyGameError(str(error)) from error
+
+
+async def _archive_rummy_table(session: RummySession) -> None:
+    if not session.table_code or session.guild_id is None:
+        return
+    try:
+        await get_tournament_service().archive_table(session.guild_id, session.table_code)
+    except TournamentPersistenceError as error:
+        raise RummyGameError(str(error)) from error
+
+
+def _require_rummy_checkpoint_saved(session: RummySession) -> None:
+    if (
+        session.table_id
+        and session.tournament_current_round in session.tournament_scored_rounds
+        and session.tournament_current_round not in session.tournament_checkpointed_rounds
+    ):
+        raise RummyGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum membuat lobby baru.")
+
+
+async def _change_rummy_mode(session: RummySession, interaction: discord.Interaction, target_mode: str) -> None:
+    if target_mode == session.mode:
+        return
+    if target_mode == "tournament":
+        if interaction.guild_id is None:
+            raise RummyGameError("Tournament persistent hanya bisa dibuat di server Discord.")
+        unregister_rummy_session(session)
+        session.mode = target_mode
+        try:
+            await get_tournament_service().create_table(session, guild_id=interaction.guild_id, game_type="rummy")
+        except TournamentPersistenceError as error:
+            session.mode = "regular"
+            session.guild_id = None
+            session.table_id = None
+            session.table_code = None
+            register_rummy_session(session)
+            raise RummyGameError(str(error)) from error
+        register_rummy_session(session)
+        return
+
+    await _archive_rummy_table(session)
+    unregister_rummy_session(session)
+    session.mode = "regular"
+    session.guild_id = None
+    session.table_id = None
+    session.table_code = None
+    session.table_name = None
+    register_rummy_session(session)
+
+
 class RummyModeSelect(discord.ui.Select):
     def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
@@ -74,10 +140,12 @@ class RummyModeSelect(discord.ui.Select):
             require_rummy_player(session, interaction.user.id)
             if session.game.status != RummyStatus.WAITING:
                 raise RummyGameError("Mode hanya bisa diubah saat lobby belum mulai.")
-            session.mode = self.values[0]
+            await _change_rummy_mode(session, interaction, self.values[0])
             if not session.is_tournament:
                 session.tournament_scores.clear()
+                session.tournament_round_points.clear()
                 session.tournament_scored_rounds.clear()
+                session.tournament_checkpointed_rounds.clear()
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)
@@ -95,6 +163,7 @@ class RummyRoundSelect(discord.ui.Select):
             if not session.is_tournament or session.game.status != RummyStatus.WAITING:
                 raise RummyGameError("Jumlah ronde hanya bisa diubah di lobby tournament.")
             session.tournament_total_rounds = int(self.values[0])
+            await _sync_rummy_lobby(session)
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)
@@ -114,6 +183,11 @@ class RummyLobbyView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             session.game.add_player(interaction.user.id, interaction.user.display_name)
+            try:
+                await _sync_rummy_lobby(session)
+            except RummyGameError:
+                session.game.players = [player for player in session.game.players if player.user_id != interaction.user.id]
+                raise
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)
@@ -122,6 +196,7 @@ class RummyLobbyView(discord.ui.View):
     async def start_game(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         try:
             session = get_rummy_session(self.channel_id)
+            await _sync_rummy_lobby(session)
             session.add_log(session.start_rummy_round())
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
@@ -132,7 +207,8 @@ class RummyLobbyView(discord.ui.View):
         try:
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
-            rummy_sessions_by_channel.pop(self.channel_id, None)
+            await _archive_rummy_table(session)
+            unregister_rummy_session(session)
             await interaction.response.edit_message(content=f"**Rummy ditutup** oleh {interaction.user.mention}.", embed=None, attachments=[], view=None)
         except RummyGameError as error:
             await reply_error(interaction, error)
@@ -184,6 +260,9 @@ class RummyGameView(discord.ui.View):
             if approved:
                 session.game.status = RummyStatus.FINISHED
                 session.game.scores = {player.user_id: 0 for player in session.game.players}
+                if session.is_tournament:
+                    session.tournament_aborted = True
+                    await _archive_rummy_table(session)
                 session.add_log(f"Vote end game disetujui {votes}/{required}. Game diakhiri.")
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
@@ -378,12 +457,26 @@ class RummyFinishedView(discord.ui.View):
 
     @discord.ui.button(label="Buat Lobby Baru", style=discord.ButtonStyle.success)
     async def new_lobby(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
-        session = RummySession(self.channel_id, interaction.user.id)
-        session.game.add_player(interaction.user.id, interaction.user.display_name)
-        old = rummy_sessions_by_channel.get(self.channel_id)
-        session.table_message_id = old.table_message_id if old else None
-        rummy_sessions_by_channel[self.channel_id] = session
-        await update_rummy_table_from_interaction(interaction, session)
+        try:
+            old = get_rummy_session(self.channel_id)
+            _require_rummy_checkpoint_saved(old)
+            session = RummySession(old.channel_id, interaction.user.id)
+            session.game.add_player(interaction.user.id, interaction.user.display_name)
+            session.table_message_id = old.table_message_id
+            unregister_rummy_session(old)
+            register_rummy_session(session)
+            await update_rummy_table_from_interaction(interaction, session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Coba Simpan Checkpoint", style=discord.ButtonStyle.secondary)
+    async def retry_checkpoint(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_rummy_session(self.channel_id)
+            require_rummy_player(session, interaction.user.id)
+            await update_rummy_table_from_interaction(interaction, session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
 
 
 class RummyTournamentRoundFinishedView(discord.ui.View):
@@ -397,6 +490,15 @@ class RummyTournamentRoundFinishedView(discord.ui.View):
             session = get_rummy_session(self.channel_id)
             require_rummy_player(session, interaction.user.id)
             session.add_log(session.start_next_tournament_round())
+            await update_rummy_table_from_interaction(interaction, session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+    @discord.ui.button(label="Coba Simpan Checkpoint", style=discord.ButtonStyle.secondary)
+    async def retry_checkpoint(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
+        try:
+            session = get_rummy_session(self.channel_id)
+            require_rummy_player(session, interaction.user.id)
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)

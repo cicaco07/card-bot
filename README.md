@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.12`
+Versi saat ini: `1.2.0`
 
 Command changelog:
 
@@ -81,9 +81,13 @@ pip install -r requirements.txt
 ```env
 DISCORD_TOKEN=token_bot_kamu
 DISCORD_GUILD_ID=id_server_opsional
+DATABASE_URL=postgresql+asyncpg://cardbot:cardbot@localhost:5432/cardbot
+DATABASE_MIGRATION_URL=postgresql+asyncpg://cardbot:cardbot@localhost:5432/cardbot
 ```
 
 `DISCORD_GUILD_ID` opsional, tapi direkomendasikan saat development karena slash command biasanya muncul lebih cepat di server tersebut.
+
+`DATABASE_URL` dan `DATABASE_MIGRATION_URL` diperlukan untuk Poker Tournament dan Rummy Tournament persistent. Mode regular dan UNO tetap dapat berjalan jika database belum tersedia.
 
 Untuk mengambil `DISCORD_GUILD_ID`, aktifkan **Developer Mode** di Discord, klik kanan server kamu, lalu pilih **Copy Server ID**.
 
@@ -92,6 +96,24 @@ Untuk mengambil `DISCORD_GUILD_ID`, aktifkan **Developer Mode** di Discord, klik
 ```bash
 python bot.py
 ```
+
+### PostgreSQL Lokal
+
+Jalankan database dan migration:
+
+```bash
+docker compose up -d postgres
+alembic upgrade head
+```
+
+### Supabase
+
+Supabase dapat dipakai sebagai PostgreSQL production tanpa Supabase SDK. Ambil connection string dari tombol **Connect** pada dashboard Supabase, lalu isi `DATABASE_URL` dan `DATABASE_MIGRATION_URL`.
+
+- Gunakan direct connection jika host bot mendukung IPv6.
+- Gunakan Supavisor session pooler jika host hanya mendukung IPv4.
+- Simpan connection string sebagai secret environment variable.
+- Jalankan `python -m alembic upgrade head` sebelum menyalakan bot versi baru. Alembic otomatis membaca connection string dari `.env`.
 
 Jika terminal menampilkan `Bot logged in as ...`, bot sudah online. Coba command `/uno_start` di channel server.
 
@@ -194,7 +216,7 @@ Lalu bot memilih engine berdasarkan parameter command, misalnya `/uno_start mode
 
 Fitur berikutnya yang paling masuk akal:
 
-- persist game ke SQLite/Redis agar tidak hilang saat restart
+- perluas persistence PostgreSQL ke UNO dan mode regular jika dibutuhkan
 - lobby owner/admin permission untuk `/uno_begin` dan `/uno_end`
 - timer auto-pass jika pemain terlalu lama
 - mode plugin agar game lain selain UNO bisa dipasang ke bot yang sama
@@ -212,6 +234,8 @@ Untuk tournament:
 ```text
 /poker-start mode:tournament rounds:3
 ```
+
+Beberapa tournament dapat berjalan bersamaan pada server atau channel yang sama. Setiap meja tournament menampilkan kode meja unik.
 
 `rounds` bisa diisi dari 3 sampai 20. Jika tidak memilih mode, bot memakai mode regular seperti sebelumnya.
 
@@ -282,6 +306,18 @@ Untuk tournament:
 ```text
 /rummy-start mode:tournament rounds:3
 ```
+
+Poker Tournament dan Rummy Tournament menyimpan checkpoint setelah ronde selesai. Ronde aktif yang terputus karena restart tidak dipulihkan; pemain mengulang ronde berikutnya dari checkpoint terakhir.
+
+Command pengelolaan tournament:
+
+```text
+/tournament-list
+/tournament-resume table_code:<kode>
+/tournament-archive table_code:<kode>
+```
+
+Panel akhir ronde tetap menyediakan tombol **Mulai Ronde Berikutnya** setelah checkpoint tersimpan.
 
 Rules utama:
 

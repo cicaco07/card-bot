@@ -6,6 +6,16 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.2.0 - 2026-06-02
+
+Multi-table tournament dan checkpoint PostgreSQL.
+
+- Menambahkan multi-table untuk Poker Tournament dan Rummy Tournament dengan kode meja unik.
+- Menyimpan checkpoint PostgreSQL setelah ronde tournament selesai dan mendukung resume manual dari ronde berikutnya.
+- Menambahkan command `/tournament-list`, `/tournament-resume`, dan `/tournament-archive`.
+- Mendukung PostgreSQL lokal melalui Docker Compose serta connection string Supabase untuk deployment.
+- Mempertahankan tombol **Mulai Ronde Berikutnya** pada panel akhir ronde setelah checkpoint berhasil tersimpan.
+
 ## 1.1.12 - 2026-06-02
 
 Skor normal dan rincian closed card Rummy.
