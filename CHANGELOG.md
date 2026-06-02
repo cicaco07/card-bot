@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.12 - 2026-06-02
+
+Skor normal dan rincian closed card Rummy.
+
+- Menghapus multiplier Go Rummy agar seluruh skor ronde dihitung normal.
+- Menghitung penalti tanda flip berdasarkan kartu **Closed Card**, bukan kartu buangan yang dijadikan meld.
+- Menampilkan rincian kartu untuk meld terbuka, meld tertutup, deadwood, dan penalti flip pada hasil akhir.
+
 ## 1.1.11 - 2026-06-01
 
 Rule Ace dan konfirmasi ambil buangan Rummy.

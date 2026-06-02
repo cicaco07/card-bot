@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.12",
+        "title": "Skor normal dan rincian closed card Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Menghapus multiplier Go Rummy agar seluruh skor ronde dihitung normal.",
+            "Menghitung penalti tanda flip berdasarkan kartu closed card, bukan kartu buangan yang dijadikan meld.",
+            "Menampilkan rincian kartu untuk meld terbuka, meld tertutup, deadwood, dan penalti flip pada hasil akhir.",
+        ],
+    },
+    {
         "version": "1.1.11",
         "title": "Rule Ace dan konfirmasi ambil buangan Rummy",
         "date": "2026-06-01",

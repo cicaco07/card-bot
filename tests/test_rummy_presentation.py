@@ -29,7 +29,7 @@ def test_rummy_lobby_and_playing_text() -> None:
         "Sisa deck: **1 kartu**\nKartu buangan teratas: **Belum ada**\nTotal buangan: 0\n"
         "3 buangan teratas:\n- Belum ada\n\n"
         "Meld terbuka dan terkunci:\n- Belum ada meld yang diturunkan.\n\n"
-        "Penalti flip card:\n- Belum ada penalti.\n\n"
+        "Tanda flip card:\n- Belum ada tanda.\n\n"
         "Jumlah kartu pemain:\n- <@1>: 1 kartu\n- <@2>: 1 kartu\n\n"
         "Vote akhiri game: **0/2 setuju**\n\nAksi terakhir:\n- Game dimulai."
     )
@@ -68,27 +68,35 @@ def test_rummy_playing_text_shows_discarding_players() -> None:
     assert "Kartu buangan teratas: **5 ♣️** - dibuang oleh <@2>" in text
     assert "3 buangan teratas:\n- 1. 5 ♣️ - dibuang oleh <@2>\n- 2. 4 ♦️ - dibuang oleh <@1>" in text
     assert "Meld terbuka dan terkunci:\n- <@2>: [J ♥️, Q ♥️, K ♥️]" in text
-    assert "Penalti flip card:\n- <@1>: A ♠️" in text
+    assert "Tanda flip card:\n- <@1>: A ♠️" in text
 
 
 def test_rummy_finished_text_shows_score_breakdown() -> None:
     session = RummySession(channel_id=10, owner_id=99)
     session.game.status = RummyStatus.FINISHED
     session.game.players = [RummyPlayer(1, "Alice")]
-    session.game.scores = {1: -80}
-    session.game.flipped_cards_by_user_id = {1: [RummyCard("9", "clubs")]}
+    session.game.scores = {1: -10}
+    session.game.flipped_cards_by_user_id = {1: [RummyCard("J", "clubs")]}
     session.game.score_breakdowns = {
         1: {
-            "opened_meld_points": 15,
-            "hand_meld_points": 0,
+            "opened_meld_points": 30,
+            "opened_melds": [["J ♥️", "Q ♥️", "K ♥️"]],
+            "hand_meld_points": 15,
+            "hand_melds": [["3 ♣️", "4 ♣️", "5 ♣️"]],
             "deadwood_points": 5,
+            "deadwood_cards": ["9 ♦️"],
             "flip_penalty_points": 50,
-            "subtotal": -40,
-            "go_rummy_multiplier": 2,
-            "total": -80,
+            "flip_cards": ["J ♣️"],
+            "flip_penalty_card": "2 ♠️",
+            "subtotal": -10,
+            "total": -10,
         }
     }
     text = rummy_finished_text(session)
-    assert "- <@1>: **-80 point**" in text
-    assert "meld terbuka +15, meld tangan +0, deadwood -5, penalti flip -50 = subtotal -40, Go Rummy x2 = total -80" in text
-    assert "Penalti flip card:\n- <@1>: 9 ♣️" in text
+    assert "- <@1>: **-10 point**" in text
+    assert "Meld terbuka: +30 point -> (J ♥️, Q ♥️, K ♥️)" in text
+    assert "Meld tertutup: +15 point -> (3 ♣️, 4 ♣️, 5 ♣️)" in text
+    assert "Deadwood: -5 point -> 9 ♦️" in text
+    assert "Penalti flip: -50 point -> 2 ♠️ sebagai closed card x 1 tanda; asal buangan: J ♣️" in text
+    assert "Total: -10 point" in text
+    assert "Tanda flip card:\n- <@1>: J ♣️" in text

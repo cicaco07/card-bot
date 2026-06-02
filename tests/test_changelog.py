@@ -9,7 +9,7 @@ from cardbot.constants import APP_VERSION
 
 
 def test_app_version_matches_latest_changelog() -> None:
-    assert APP_VERSION == latest_changelog_entry()["version"] == "1.1.11"
+    assert APP_VERSION == latest_changelog_entry()["version"] == "1.1.12"
 
 
 def test_public_changelog_version_reads_published_message() -> None:
@@ -19,9 +19,9 @@ def test_public_changelog_version_reads_published_message() -> None:
 
 def test_unpublished_public_changelog_entries_fill_version_gaps_in_order() -> None:
     entries = unpublished_public_changelog_entries({"1.1.1", "1.1.3", "1.1.5"})
-    assert [entry["version"] for entry in entries] == ["1.1.2", "1.1.4", "1.1.6", "1.1.7", "1.1.8", "1.1.9", "1.1.10", "1.1.11"]
+    assert [entry["version"] for entry in entries] == ["1.1.2", "1.1.4", "1.1.6", "1.1.7", "1.1.8", "1.1.9", "1.1.10", "1.1.11", "1.1.12"]
 
 
 def test_first_publication_only_sends_latest_changelog() -> None:
     entries = unpublished_public_changelog_entries(set())
-    assert [entry["version"] for entry in entries] == ["1.1.11"]
+    assert [entry["version"] for entry in entries] == ["1.1.12"]

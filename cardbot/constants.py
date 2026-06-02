@@ -3,7 +3,7 @@
 from discord import app_commands
 
 
-APP_VERSION = "1.1.11"
+APP_VERSION = "1.1.12"
 
 COLOR_CHOICES = [
     app_commands.Choice(name="Merah", value="red"),

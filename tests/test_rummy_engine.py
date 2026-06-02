@@ -16,6 +16,7 @@ from rummy.game import (
     is_valid_meld,
     score_hand,
     score_hand_breakdown,
+    score_hand_details,
 )
 
 
@@ -76,14 +77,14 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
         game.discard_card(1, 1)
     assert game.lay_down_meld(1, [2, 3, 4]).public_messages == [
         "Alice menurunkan meld bukti dan menguncinya: 3 ♥️, 4 ♥️, 5 ♥️.",
-        "Bob mendapat penalti flip card -50 poin karena 4 ♥️ dijadikan meld bukti.",
+        "Bob mendapat tanda flip karena 4 ♥️ dijadikan meld bukti. Nilai penalti mengikuti closed card.",
     ]
     assert game.flipped_cards_by_user_id == {2: [RummyCard("4", "hearts")]}
     assert game.players[0].hand == cards(("9", "clubs"))
     assert game.players[0].opened_melds == [tuple(cards(("3", "hearts"), ("4", "hearts"), ("5", "hearts")))]
     assert game.required_discard_meld_card is None
     assert game.discard_card(1, 1).public_messages == [
-        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️.",
         "Giliran berikutnya: Bob.",
     ]
     assert game.discard_pile == cards(("9", "clubs"))
@@ -115,9 +116,8 @@ def test_draw_from_discard_requires_manual_locked_meld_and_takes_cards_above_tar
     game.discard_pile = cards(("4", "hearts"))
     game.draw_from_discard(1, 1)
     assert game.lay_down_meld(1, [1, 2, 3, 4]).public_messages == [
-        "Alice menghabiskan seluruh kartu melalui meld. Go Rummy aktif untuk perhitungan skor akhir. "
-        "Deck habis. Perhitungan skor dimulai. Go Rummy aktif: seluruh poin ronde dikalikan 2.",
-        "Skor ronde: Alice +40, Bob +0.",
+        "Alice menghabiskan seluruh kartu melalui meld. Deck habis. Perhitungan skor dimulai.",
+        "Skor ronde: Alice +20, Bob +0.",
     ]
 
     game = RummyGame()
@@ -146,7 +146,7 @@ def test_empty_hand_from_meld_continues_round_and_skips_players_without_cards() 
     game.deck = cards(("K", "spades"))
     game.awaiting_discard_user_id = 1
     assert game.lay_down_meld(1, [1, 2, 3]).public_messages == [
-        "Alice menghabiskan seluruh kartu melalui meld. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Alice menghabiskan seluruh kartu melalui meld.",
         "Giliran berikutnya: Charlie.",
     ]
     assert game.status == RummyStatus.PLAYING
@@ -164,9 +164,8 @@ def test_discard_proof_meld_accepts_long_run_with_joker() -> None:
     game.discard_pile = cards(("4", "hearts"))
     game.draw_from_discard(1, 1)
     assert game.lay_down_meld(1, [1, 2, 3, 4, 5]).public_messages == [
-        "Alice menghabiskan seluruh kartu melalui meld. Go Rummy aktif untuk perhitungan skor akhir. "
-        "Deck habis. Perhitungan skor dimulai. Go Rummy aktif: seluruh poin ronde dikalikan 2.",
-        "Skor ronde: Alice +80, Bob -10.",
+        "Alice menghabiskan seluruh kartu melalui meld. Deck habis. Perhitungan skor dimulai.",
+        "Skor ronde: Alice +40, Bob -5.",
     ]
     assert game.players[0].opened_melds == [
         tuple([*cards(("4", "hearts"), ("5", "hearts"), ("7", "hearts"), ("8", "hearts")), joker])
@@ -181,7 +180,7 @@ def test_empty_hand_from_regular_discard_continues_round() -> None:
     game.awaiting_discard_user_id = 1
     game.last_draw_source = "deck"
     assert game.discard_card(1, 1).public_messages == [
-        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️. Go Rummy aktif untuk perhitungan skor akhir.",
+        "Alice menghabiskan seluruh kartu dengan membuang 9 ♣️.",
         "Giliran berikutnya: Bob.",
     ]
     assert game.status == RummyStatus.PLAYING
@@ -228,57 +227,81 @@ def test_regular_discard_rejects_joker_but_close_allows_it_without_bonus() -> No
         game.discard_card(1, 4)
     result = game.discard_card(1, 4, close=True)
     assert result.closed_user_id == 1
-    assert result.scores[1] == 30
-    assert result.scores[2] == -10
+    assert result.scores[1] == 15
+    assert result.scores[2] == -5
     assert game.score_breakdowns == {
         1: {
             "opened_meld_points": 0,
+            "opened_melds": [],
             "hand_meld_points": 15,
+            "hand_melds": [["2 ♥️", "3 ♥️", "4 ♥️"]],
             "deadwood_points": 0,
+            "deadwood_cards": [],
             "flip_penalty_points": 0,
+            "flip_cards": [],
+            "flip_penalty_card": None,
             "subtotal": 15,
-            "go_rummy_multiplier": 2,
-            "total": 30,
+            "total": 15,
         },
         2: {
             "opened_meld_points": 0,
+            "opened_melds": [],
             "hand_meld_points": 0,
+            "hand_melds": [],
             "deadwood_points": 5,
+            "deadwood_cards": ["9 ♣️"],
             "flip_penalty_points": 0,
+            "flip_cards": [],
+            "flip_penalty_card": None,
             "subtotal": -5,
-            "go_rummy_multiplier": 2,
-            "total": -10,
+            "total": -5,
         },
     }
-    assert game.go_rummy_user_id == 1
 
 
-def test_closed_card_accepts_last_card_and_applies_flip_penalty_to_discarder() -> None:
+def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [RummyPlayer(1, "Alice", cards(("2", "spades"))), RummyPlayer(2, "Bob", cards(("9", "clubs")))]
     game.deck = cards(("K", "spades"))
     game.awaiting_discard_user_id = 1
     game.last_draw_source = "deck"
-    game.flipped_cards_by_user_id = {2: cards(("4", "hearts"))}
+    game.flipped_cards_by_user_id = {2: cards(("J", "hearts"))}
 
     result = game.discard_card(1, 1, close=True)
 
     assert result.public_messages == [
-        "Alice closed card dengan 2 ♠️. Go Rummy aktif: seluruh poin ronde dikalikan 2.",
-        "Skor ronde: Alice +0, Bob -110.",
+        "Alice closed card dengan 2 ♠️.",
+        "Skor ronde: Alice +0, Bob -55.",
     ]
     assert result.closed_user_id == 1
     assert game.status == RummyStatus.FINISHED
     assert game.score_breakdowns[2] == {
         "opened_meld_points": 0,
+        "opened_melds": [],
         "hand_meld_points": 0,
+        "hand_melds": [],
         "deadwood_points": 5,
+        "deadwood_cards": ["9 ♣️"],
         "flip_penalty_points": 50,
+        "flip_cards": ["J ♥️"],
+        "flip_penalty_card": "2 ♠️",
         "subtotal": -55,
-        "go_rummy_multiplier": 2,
-        "total": -110,
+        "total": -55,
     }
+
+
+def test_flip_marks_do_not_apply_penalty_without_closed_card() -> None:
+    game = RummyGame()
+    game.status = RummyStatus.PLAYING
+    game.players = [RummyPlayer(1, "Alice", cards(("2", "spades"))), RummyPlayer(2, "Bob", cards(("9", "clubs")))]
+    game.flipped_cards_by_user_id = {2: cards(("J", "hearts"))}
+
+    result = game.draw_from_deck(1)
+
+    assert result.scores == {1: -5, 2: -5}
+    assert game.score_breakdowns[2]["flip_penalty_points"] == 0
+    assert game.score_breakdowns[2]["flip_penalty_card"] is None
 
 
 def test_ace_discard_requires_own_non_ace_opened_meld() -> None:
@@ -366,6 +389,7 @@ def test_score_and_flip_card_penalty_rules() -> None:
     hand = cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts"), ("A", "clubs"))
     assert score_hand(hand) == 0
     assert score_hand_breakdown(hand) == (15, 15)
+    assert score_hand_details(hand) == ([tuple(cards(("2", "hearts"), ("3", "hearts"), ("4", "hearts")))], cards(("A", "clubs")))
     assert flip_card_penalty(RummyCard("9", "clubs")) == 50
     assert flip_card_penalty(RummyCard("K", "clubs")) == 100
     assert flip_card_penalty(RummyCard("A", "clubs")) == 150
