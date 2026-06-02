@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.1.16 - 2026-06-03
+
+Transfer bonus flip card Rummy.
+
+- Memberikan bonus kepada pemain yang melakukan flip card sebesar total penalti yang diterapkan kepada pemain terdampak.
+- Menampilkan rincian bonus flip dan pemain yang membayar penalti pada hasil akhir ronde.
+- Mempertahankan penalti maksimal satu kali per pemain terdampak berdasarkan nilai kartu flip.
+
 ## 1.1.15 - 2026-06-02
 
 Koreksi pemicu penalti flip card Rummy.

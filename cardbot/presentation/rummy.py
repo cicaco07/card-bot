@@ -104,6 +104,7 @@ def _finished_score_text(user_id: int, score: int, details: dict[str, object] | 
         f"  - Meld terbuka: {int(details['opened_meld_points']):+d} point -> {_melds_text(details['opened_melds'])}\n"
         f"  - Meld tertutup: {int(details['hand_meld_points']):+d} point -> {_melds_text(details['hand_melds'])}\n"
         f"  - Deadwood: {-int(details['deadwood_points']):+d} point -> {_cards_text(details['deadwood_cards'])}\n"
+        f"  - Bonus flip: {int(details['flip_reward_points']):+d} point -> {_flip_reward_text(details)}\n"
         f"  - Penalti flip: {-int(details['flip_penalty_points']):+d} point -> {_flip_penalty_text(details)}\n"
         f"  - Total: {int(details['total']):+d} point"
     )
@@ -129,7 +130,7 @@ def rummy_rules_embed() -> discord.Embed:
     embed.add_field(name="Ambil Buangan", value="Boleh mengambil maksimal 3 kartu buangan teratas. Pilih target lalu tekan Konfirmasi Ambil. Ambil 1-3 wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi.", inline=False)
     embed.add_field(name="Rule Ace", value="Ace dari buangan belum boleh diambil dan Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld miliknya sendiri yang tidak memakai Ace.", inline=False)
     embed.add_field(name="Closed Card", value="Kartu terakhir boleh dipakai sebagai closed card untuk langsung mengakhiri ronde. Jika masih ada kartu lain, semuanya wajib sudah dapat menjadi meld.", inline=False)
-    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Flip card hanya terjadi jika pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai closed card pada giliran yang sama. Pemilik target buangan dan kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Nilai penalti mengikuti kartu closed card.", inline=False)
+    embed.add_field(name="Skor", value="Kartu angka +5, J/Q/K +10, Ace +15. Meld bernilai positif dan kartu tersisa bernilai negatif. Flip card hanya terjadi jika pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai closed card pada giliran yang sama. Pemilik target buangan dan kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Pemain yang melakukan flip menerima total nilai penalti tersebut sebagai bonus. Nilai transfer mengikuti kartu closed card.", inline=False)
     embed.add_field(name="Tournament", value="Ronde pertama memilih pemain awal secara acak dan berjalan searah jarum jam. Ronde berikutnya dimulai dari pemain dengan skor kumulatif terendah. Jika ronde sebelumnya menghasilkan penalti flip, arah ronde berikutnya menjadi berlawanan arah jarum jam.", inline=False)
     return embed
 
@@ -175,6 +176,15 @@ def _flip_penalty_text(details: dict[str, object]) -> str:
     if penalty_card is None:
         return f"tidak diterapkan tanpa flip card; buangan yang terambil pada giliran penutup: {origins}"
     return f"{penalty_card} sebagai flip card; buangan yang terambil pada giliran penutup: {origins}"
+
+
+def _flip_reward_text(details: dict[str, object]) -> str:
+    reward_user_ids = cast(list[int], details["flip_reward_user_ids"])
+    if not reward_user_ids:
+        return "-"
+    reward_card = details["flip_reward_card"]
+    users = ", ".join(mention(user_id) for user_id in reward_user_ids)
+    return f"{reward_card} sebagai flip card; penalti diterima dari {users}"
 
 
 def rummy_hand_text(game: RummyGame, user_id: int, page: int = 0, page_size: int = 25, selected_numbers: set[int] | None = None) -> str:

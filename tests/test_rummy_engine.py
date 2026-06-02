@@ -264,6 +264,9 @@ def test_regular_discard_rejects_joker_but_close_allows_it_without_bonus() -> No
             "hand_melds": [["2 ♥️", "3 ♥️", "4 ♥️"]],
             "deadwood_points": 0,
             "deadwood_cards": [],
+            "flip_reward_points": 0,
+            "flip_reward_user_ids": [],
+            "flip_reward_card": None,
             "flip_penalty_points": 0,
             "flip_cards": [],
             "flip_penalty_card": None,
@@ -277,6 +280,9 @@ def test_regular_discard_rejects_joker_but_close_allows_it_without_bonus() -> No
             "hand_melds": [],
             "deadwood_points": 5,
             "deadwood_cards": ["9 ♣️"],
+            "flip_reward_points": 0,
+            "flip_reward_user_ids": [],
+            "flip_reward_card": None,
             "flip_penalty_points": 0,
             "flip_cards": [],
             "flip_penalty_card": None,
@@ -290,7 +296,7 @@ def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
     game = RummyGame()
     game.status = RummyStatus.PLAYING
     game.players = [
-        RummyPlayer(1, "Alice", cards(("2", "spades"), ("3", "hearts"), ("5", "hearts"))),
+        RummyPlayer(1, "Alice", cards(("A", "spades"), ("3", "hearts"), ("5", "hearts"))),
         RummyPlayer(2, "Bob", cards(("9", "clubs"))),
     ]
     game.deck = cards(("K", "spades"))
@@ -302,12 +308,15 @@ def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
     result = game.discard_card(1, 1, close=True)
 
     assert result.public_messages == [
-        "Alice closed card dengan 2 ♠️.",
-        "Skor ronde: Alice +15, Bob -55.",
+        "Alice closed card dengan A ♠️.",
+        "Skor ronde: Alice +165, Bob -155.",
     ]
     assert result.closed_user_id == 1
     assert game.status == RummyStatus.FINISHED
     assert game.flip_source_cards_by_user_id == {2: cards(("4", "hearts"))}
+    assert game.score_breakdowns[1]["flip_reward_points"] == 150
+    assert game.score_breakdowns[1]["flip_reward_user_ids"] == [2]
+    assert game.score_breakdowns[1]["flip_reward_card"] == "A ♠️"
     assert game.score_breakdowns[2] == {
         "opened_meld_points": 0,
         "opened_melds": [],
@@ -315,11 +324,14 @@ def test_closed_card_uses_closing_card_value_for_flip_penalty() -> None:
         "hand_melds": [],
         "deadwood_points": 5,
         "deadwood_cards": ["9 ♣️"],
-        "flip_penalty_points": 50,
+        "flip_reward_points": 0,
+        "flip_reward_user_ids": [],
+        "flip_reward_card": None,
+        "flip_penalty_points": 150,
         "flip_cards": ["4 ♥️"],
-        "flip_penalty_card": "2 ♠️",
-        "subtotal": -55,
-        "total": -55,
+        "flip_penalty_card": "A ♠️",
+        "subtotal": -155,
+        "total": -155,
     }
 
 
@@ -347,6 +359,8 @@ def test_multiple_discard_meld_sources_only_apply_one_flip_penalty_per_player() 
     result = game.discard_card(1, 1, close=True)
 
     assert result.scores[2] == -55
+    assert result.scores[1] == 50
+    assert game.score_breakdowns[1]["flip_reward_points"] == 50
     assert game.score_breakdowns[2]["flip_penalty_points"] == 50
     assert game.score_breakdowns[2]["flip_cards"] == ["4 ♥️", "J ♥️"]
 
@@ -373,6 +387,8 @@ def test_flip_card_penalizes_target_and_discards_above_target() -> None:
     }
     assert game.score_breakdowns[2]["flip_penalty_points"] == 50
     assert game.score_breakdowns[3]["flip_penalty_points"] == 50
+    assert game.score_breakdowns[1]["flip_reward_points"] == 100
+    assert game.score_breakdowns[1]["flip_reward_user_ids"] == [2, 3]
 
 
 def test_closed_card_with_hidden_meld_after_discard_draw_is_not_flip_card() -> None:
@@ -392,6 +408,7 @@ def test_closed_card_with_hidden_meld_after_discard_draw_is_not_flip_card() -> N
     game.discard_card(1, 1, close=True)
 
     assert game.flip_source_cards_by_user_id == {}
+    assert game.score_breakdowns[1]["flip_reward_points"] == 0
     assert game.score_breakdowns[2]["flip_penalty_points"] == 0
     assert game.score_breakdowns[3]["flip_penalty_points"] == 0
 

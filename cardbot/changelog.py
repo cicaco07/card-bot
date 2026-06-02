@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.1.16",
+        "title": "Transfer bonus flip card Rummy",
+        "date": "2026-06-03",
+        "changes": [
+            "Memberikan bonus kepada pemain yang melakukan flip card sebesar total penalti yang diterapkan kepada pemain terdampak.",
+            "Menampilkan rincian bonus flip dan pemain yang membayar penalti pada hasil akhir ronde.",
+            "Mempertahankan penalti maksimal satu kali per pemain terdampak berdasarkan nilai kartu flip.",
+        ],
+    },
+    {
         "version": "1.1.15",
         "title": "Koreksi pemicu penalti flip card Rummy",
         "date": "2026-06-02",

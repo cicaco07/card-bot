@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.1.15`
+Versi saat ini: `1.1.16`
 
 Command changelog:
 
@@ -297,7 +297,7 @@ Rules utama:
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
 - Flip card hanya terjadi jika dalam satu giliran pemain mengambil kartu buangan, menurunkan meld bukti, menyisakan tepat satu kartu, lalu memakai kartu terakhir tersebut sebagai **Closed Card**. Closed card mandiri di luar skenario ini tidak memberi penalti flip.
-- Saat flip card terjadi, pemilik kartu target dan pemilik setiap kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Nilai penalti mengikuti kartu **Closed Card**.
+- Saat flip card terjadi, pemilik kartu target dan pemilik setiap kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Pemain yang melakukan flip menerima total nilai penalti tersebut sebagai bonus. Nilai transfer mengikuti kartu **Closed Card**.
 - Hasil akhir ronde menampilkan rincian kartu pada meld terbuka, meld tertutup, deadwood, penalti flip, dan total skor normal.
 - Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
 - Mode tournament mengakumulasi skor selama 3-20 ronde.

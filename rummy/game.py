@@ -356,6 +356,12 @@ class RummyGame:
         self.required_discard_meld_size = None
         self._clear_pending_flip_sources()
         self.score_breakdowns = {}
+        penalized_flip_user_ids = [
+            player.user_id
+            for player in self.players
+            if self.closed_card is not None and self.flip_source_cards_by_user_id.get(player.user_id)
+        ]
+        flip_reward_points = flip_card_penalty(self.closed_card) * len(penalized_flip_user_ids) if self.closed_card else 0
         for player in self.players:
             hand_melds, deadwood_cards = score_hand_details(player.hand)
             opened_meld_points = _melds_point_value(player.opened_melds)
@@ -363,7 +369,8 @@ class RummyGame:
             deadwood_points = sum(card.point_value for card in deadwood_cards)
             flipped_cards = self.flip_source_cards_by_user_id.get(player.user_id, [])
             flip_penalty_points = flip_card_penalty(self.closed_card) if self.closed_card and flipped_cards else 0
-            subtotal = opened_meld_points + hand_meld_points - deadwood_points - flip_penalty_points
+            player_flip_reward_points = flip_reward_points if player.user_id == self.closed_user_id else 0
+            subtotal = opened_meld_points + hand_meld_points + player_flip_reward_points - deadwood_points - flip_penalty_points
             self.score_breakdowns[player.user_id] = {
                 "opened_meld_points": opened_meld_points,
                 "opened_melds": _meld_labels(player.opened_melds),
@@ -371,6 +378,9 @@ class RummyGame:
                 "hand_melds": _meld_labels(hand_melds),
                 "deadwood_points": deadwood_points,
                 "deadwood_cards": _card_labels(deadwood_cards),
+                "flip_reward_points": player_flip_reward_points,
+                "flip_reward_user_ids": list(penalized_flip_user_ids) if player_flip_reward_points else [],
+                "flip_reward_card": self.closed_card.activity_label if self.closed_card and player_flip_reward_points else None,
                 "flip_penalty_points": flip_penalty_points,
                 "flip_cards": _card_labels(flipped_cards),
                 "flip_penalty_card": self.closed_card.activity_label if self.closed_card and flipped_cards else None,
