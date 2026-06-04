@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.2.0`
+Versi saat ini: `1.2.1`
 
 Command changelog:
 

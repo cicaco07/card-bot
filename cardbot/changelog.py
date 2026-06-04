@@ -7,6 +7,15 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.2.1",
+        "title": "Emoji suit publik Remi Poker",
+        "date": "2026-06-04",
+        "changes": [
+            "Mengganti label kartu publik Remi Poker menjadi format ringkas dengan emoji suit, misalnya K ♦️.",
+            "Menyamakan tampilan log aksi, kombinasi terakhir, dropdown kartu, dan kartu 3 penentu giliran dengan format Rummy.",
+        ],
+    },
+    {
         "version": "1.2.0",
         "title": "Multi-table tournament dan checkpoint PostgreSQL",
         "date": "2026-06-02",

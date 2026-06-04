@@ -24,6 +24,12 @@ SUIT_LABELS = {
     "hearts": "Hearts",
     "spades": "Spades",
 }
+SUIT_EMOJIS = {
+    "diamonds": "♦️",
+    "clubs": "♣️",
+    "hearts": "♥️",
+    "spades": "♠️",
+}
 START_THREE_PRIORITY = {
     "diamonds": 0,
     "clubs": 1,
@@ -63,4 +69,8 @@ class PokerCard:
 
     @property
     def label(self) -> str:
+        return f"{self.rank} {SUIT_EMOJIS[self.suit]}"
+
+    @property
+    def full_label(self) -> str:
         return f"{RANK_LABELS.get(self.rank, self.rank)} of {SUIT_LABELS[self.suit]}"

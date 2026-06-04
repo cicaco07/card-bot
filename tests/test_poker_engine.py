@@ -25,7 +25,7 @@ def test_seeded_start_is_stable(seeded: int) -> None:
 
     assert game.start() == [
         "Game Remi Poker dimulai dengan 4 pemain.",
-        "Kartu 3 penentu giliran: Alice: 3 of Clubs | Bob: Tidak ada | Cara: 3 of Spades, 3 of Hearts | Dedi: 3 of Diamonds.",
+        "Kartu 3 penentu giliran: Alice: 3 ♣️ | Bob: Tidak ada | Cara: 3 ♠️, 3 ♥️ | Dedi: 3 ♦️.",
         "Urutan awal berdasarkan kartu 3: Cara -> Alice -> Dedi -> Bob.",
         "Semua kartu 3 dibuang. Rank terendah yang dimainkan adalah 4.",
         "Giliran pertama: Cara.",
@@ -68,7 +68,7 @@ def test_pair_play_auto_skips_player_without_higher_pair() -> None:
     result = game.play_cards(1, [1, 2])
 
     assert result.public_messages == [
-        "Alice memainkan Pair: 4 of Diamonds, 4 of Clubs.",
+        "Alice memainkan Pair: 4 ♦️, 4 ♣️.",
         "Bob auto-skip karena tidak punya kombinasi yang bisa mengalahkan.",
         "Giliran berikutnya: Cara.",
     ]
@@ -135,3 +135,9 @@ def test_tournament_scoring_keeps_regular_and_bomb_points() -> None:
     session.game.loser_id = 1
     assert session.score_finished_tournament_round() == ["Skor ronde 2: <@2> +40, <@3> +0, <@1> -40."]
     assert session.tournament_scores == {1: -20, 2: 50, 3: -10}
+
+
+def test_public_card_label_uses_suit_emoji_but_full_label_is_available() -> None:
+    card = PokerCard("K", "diamonds")
+    assert card.label == "K ♦️"
+    assert card.full_label == "King of Diamonds"
