@@ -19,6 +19,46 @@ CHANGELOG_ENTRIES = [
         ],
     },
     {
+        "version": "1.1.16",
+        "title": "Transfer bonus flip card Rummy",
+        "date": "2026-06-03",
+        "changes": [
+            "Memberikan bonus kepada pemain yang melakukan flip card sebesar total penalti yang diterapkan kepada pemain terdampak.",
+            "Menampilkan rincian bonus flip dan pemain yang membayar penalti pada hasil akhir ronde.",
+            "Mempertahankan penalti maksimal satu kali per pemain terdampak berdasarkan nilai kartu flip.",
+        ],
+    },
+    {
+        "version": "1.1.15",
+        "title": "Koreksi pemicu penalti flip card Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Membatasi flip card hanya saat pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai closed card pada giliran yang sama.",
+            "Menghapus penalti flip dari closed card mandiri dan dari histori meld bukti pada giliran sebelumnya.",
+            "Menerapkan penalti kepada pemilik kartu target serta pemilik kartu di atas target yang ikut terambil saat flip card.",
+        ],
+    },
+    {
+        "version": "1.1.14",
+        "title": "Urutan giliran tournament Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Mengacak pemain awal ronde pertama tournament Rummy dengan arah searah jarum jam.",
+            "Memulai ronde tournament berikutnya dari pemain dengan skor kumulatif terendah.",
+            "Mengubah arah ronde tournament berikutnya menjadi berlawanan arah jarum jam jika ronde sebelumnya menghasilkan penalti flip.",
+        ],
+    },
+    {
+        "version": "1.1.13",
+        "title": "Penalti flip tunggal dan batas joker Rummy",
+        "date": "2026-06-02",
+        "changes": [
+            "Menerapkan penalti flip maksimal satu kali per pemain terdampak saat closed card, bukan setiap kali kartu buangan dijadikan meld bukti.",
+            "Menyembunyikan kandidat penalti flip selama ronde masih berjalan dan menampilkannya pada hasil akhir.",
+            "Membatasi joker agar hanya dapat menggantikan kartu angka 2-10, bukan J, Q, K, atau Ace.",
+        ],
+    },
+    {
         "version": "1.1.12",
         "title": "Skor normal dan rincian closed card Rummy",
         "date": "2026-06-02",

@@ -16,6 +16,38 @@ Multi-table tournament dan checkpoint PostgreSQL.
 - Mendukung PostgreSQL lokal melalui Docker Compose serta connection string Supabase untuk deployment.
 - Mempertahankan tombol **Mulai Ronde Berikutnya** pada panel akhir ronde setelah checkpoint berhasil tersimpan.
 
+## 1.1.16 - 2026-06-03
+
+Transfer bonus flip card Rummy.
+
+- Memberikan bonus kepada pemain yang melakukan flip card sebesar total penalti yang diterapkan kepada pemain terdampak.
+- Menampilkan rincian bonus flip dan pemain yang membayar penalti pada hasil akhir ronde.
+- Mempertahankan penalti maksimal satu kali per pemain terdampak berdasarkan nilai kartu flip.
+
+## 1.1.15 - 2026-06-02
+
+Koreksi pemicu penalti flip card Rummy.
+
+- Membatasi flip card hanya saat pemain mengambil buangan, menurunkan meld bukti, lalu memakai satu kartu terakhirnya sebagai **Closed Card** pada giliran yang sama.
+- Menghapus penalti flip dari closed card mandiri dan dari histori meld bukti pada giliran sebelumnya.
+- Menerapkan penalti kepada pemilik kartu target serta pemilik kartu di atas target yang ikut terambil saat flip card.
+
+## 1.1.14 - 2026-06-02
+
+Urutan giliran tournament Rummy.
+
+- Mengacak pemain awal ronde pertama tournament Rummy dengan arah searah jarum jam.
+- Memulai ronde tournament berikutnya dari pemain dengan skor kumulatif terendah.
+- Mengubah arah ronde tournament berikutnya menjadi berlawanan arah jarum jam jika ronde sebelumnya menghasilkan penalti flip.
+
+## 1.1.13 - 2026-06-02
+
+Penalti flip tunggal dan batas joker Rummy.
+
+- Menerapkan penalti flip maksimal satu kali per pemain terdampak saat **Closed Card**, bukan setiap kali kartu buangan dijadikan meld bukti.
+- Menyembunyikan kandidat penalti flip selama ronde masih berjalan dan menampilkannya pada hasil akhir.
+- Membatasi joker agar hanya dapat menggantikan kartu angka `2-10`, bukan `J`, `Q`, `K`, atau Ace.
+
 ## 1.1.12 - 2026-06-02
 
 Skor normal dan rincian closed card Rummy.

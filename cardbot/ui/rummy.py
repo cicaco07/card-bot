@@ -146,6 +146,7 @@ class RummyModeSelect(discord.ui.Select):
                 session.tournament_round_points.clear()
                 session.tournament_scored_rounds.clear()
                 session.tournament_checkpointed_rounds.clear()
+                session.tournament_next_turn_direction = 1
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)

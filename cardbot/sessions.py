@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+import random
 
 import discord
 
@@ -229,6 +230,7 @@ class RummySession:
     tournament_checkpointed_rounds: set[int] = field(default_factory=set)
     tournament_checkpoint_error: str | None = None
     tournament_aborted: bool = False
+    tournament_next_turn_direction: int = 1
     game: RummyGame = field(default_factory=RummyGame)
     table_message_id: int | None = None
     log: list[str] = field(default_factory=list)
@@ -284,11 +286,32 @@ class RummySession:
     def start_rummy_round(self) -> list[str]:
         if not self.is_tournament:
             return self.game.start()
-        self.tournament_current_round += 1
+        if self.game.status != RummyStatus.WAITING or len(self.game.players) < self.game.min_players:
+            return self.game.start()
+        round_number = self.tournament_current_round + 1
         self.end_game_votes.clear()
         if not self.tournament_scores:
             self.tournament_scores = {player.user_id: 0 for player in self.game.players}
-        return [f"Ronde tournament {self.tournament_current_round}/{self.tournament_total_rounds} dimulai."] + self.game.start()
+        if round_number == 1:
+            starting_user_id = random.choice(self.game.players).user_id
+            turn_direction = 1
+        else:
+            lowest_score = min(self.tournament_scores.get(player.user_id, 0) for player in self.game.players)
+            lowest_score_players = [
+                player
+                for player in self.game.players
+                if self.tournament_scores.get(player.user_id, 0) == lowest_score
+            ]
+            starting_user_id = random.choice(lowest_score_players).user_id
+            turn_direction = self.tournament_next_turn_direction
+        messages = self.game.start(starting_user_id=starting_user_id, turn_direction=turn_direction)
+        self.tournament_current_round = round_number
+        direction = "searah jarum jam" if turn_direction == 1 else "berlawanan arah jarum jam"
+        return [
+            f"Ronde tournament {self.tournament_current_round}/{self.tournament_total_rounds} dimulai.",
+            f"Arah giliran ronde: {direction}.",
+            *messages,
+        ]
 
     def start_next_tournament_round(self) -> list[str]:
         if not self.tournament_between_rounds:
@@ -312,6 +335,7 @@ class RummySession:
         round_points = [(player.user_id, self.game.scores.get(player.user_id, 0)) for player in self.game.players]
         for user_id, points in round_points:
             self.tournament_scores[user_id] = self.tournament_scores.get(user_id, 0) + points
+        self.tournament_next_turn_direction = -1 if self.game.has_flip_penalty else 1
         self.tournament_scored_rounds.add(self.tournament_current_round)
         self.tournament_round_points[self.tournament_current_round] = dict(round_points)
         summary = format_tournament_round_summary(self.tournament_current_round, round_points)

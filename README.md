@@ -327,15 +327,19 @@ Rules utama:
 - Buangan dapat dipilih dari maksimal 3 kartu teratas. Mengambil 1-3 kartu wajib meld bukti minimal 3 kartu: kartu target dan minimal 2 kartu tangan sebelumnya. Kartu di atas target bebas disimpan atau dibuang lagi. Meld lalu dibuka ke semua pemain dan dikunci.
 - Panel 3 buangan teratas menampilkan pemain yang membuang setiap kartu.
 - Meld berupa run minimal 3 kartu berurutan dengan suit sama atau set minimal 3 kartu rank sama.
-- Joker boleh menggantikan kartu meld dan tidak boleh dibuang biasa.
+- Joker hanya boleh menggantikan kartu angka `2-10` pada meld dan tidak boleh dibuang biasa. Joker tidak sah untuk menggantikan `J`, `Q`, `K`, atau Ace.
 - Ace dari buangan belum boleh diambil dan Ace belum boleh dibuang sebelum pemain tersebut menurunkan minimal satu meld miliknya sendiri yang tidak memakai Ace.
 - Tombol **Closed Card** mengakhiri ronde. Kartu terakhir boleh langsung dipakai sebagai closed card; jika masih ada kartu lain, semuanya wajib dapat menjadi meld.
 - Menghabiskan kartu melalui meld atau buangan biasa tidak langsung mengakhiri ronde. Permainan berlanjut sampai deck habis atau ada pemain yang melakukan **Closed Card**.
 - Meld bernilai positif; kartu tersisa bernilai negatif.
-- Jika kartu buangan dijadikan target meld bukti, pemain yang membuang kartu mendapat tanda flip. Saat pemain lain melakukan **Closed Card**, setiap tanda memberi penalti sesuai kartu penutup: angka -50, J/Q/K -100, Ace -150, joker -250. Jika ronde selesai tanpa **Closed Card**, tanda tidak memberi penalti.
-- Hasil akhir ronde menampilkan rincian kartu pada meld terbuka, meld tertutup, deadwood, tanda flip, dan total skor normal.
+- Flip card hanya terjadi jika dalam satu giliran pemain mengambil kartu buangan, menurunkan meld bukti, menyisakan tepat satu kartu, lalu memakai kartu terakhir tersebut sebagai **Closed Card**. Closed card mandiri di luar skenario ini tidak memberi penalti flip.
+- Saat flip card terjadi, pemilik kartu target dan pemilik setiap kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Pemain yang melakukan flip menerima total nilai penalti tersebut sebagai bonus. Nilai transfer mengikuti kartu **Closed Card**.
+- Hasil akhir ronde menampilkan rincian kartu pada meld terbuka, meld tertutup, deadwood, penalti flip, dan total skor normal.
 - Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
 - Mode tournament mengakumulasi skor selama 3-20 ronde.
+- Pada ronde pertama tournament, pemain awal dipilih acak dan giliran berjalan searah jarum jam.
+- Ronde tournament berikutnya dimulai dari pemain dengan skor kumulatif terendah. Jika seri, pemain awal dipilih acak di antara skor terendah.
+- Jika ronde sebelumnya menghasilkan penalti flip, arah ronde tournament berikutnya menjadi berlawanan arah jarum jam.
 
 Panel Rummy memakai tombol:
 
