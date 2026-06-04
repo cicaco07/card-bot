@@ -287,9 +287,11 @@ def resume_session(table: TournamentTableSnapshot) -> PokerSession | RummySessio
     for player in table.players:
         session.game.add_player(player.user_id, player.display_name)
     session.game.status = finished_status
+    session.tournament_resume_ready_required = True
+    session.tournament_resume_ready_user_ids.clear()
     session.add_log(
         f"Checkpoint meja {table.table_code} dimuat setelah ronde {table.completed_rounds}. "
-        "Ronde yang terputus di tengah permainan tidak dipulihkan."
+        "Semua pemain harus menekan Siap Resume sebelum ronde berikutnya dimulai."
     )
     return session
 

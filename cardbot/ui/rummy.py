@@ -498,10 +498,34 @@ class RummyFinishedView(discord.ui.View):
             await reply_error(interaction, error)
 
 
+class RummyResumeReadyButton(discord.ui.Button):
+    def __init__(self, channel_id: int) -> None:
+        self.channel_id = channel_id
+        super().__init__(label="Siap Resume", style=discord.ButtonStyle.primary)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            session = get_rummy_session(self.channel_id)
+            ready, required, complete = session.add_tournament_resume_ready(interaction.user.id)
+            if complete:
+                session.add_log("Semua pemain siap resume. Ronde berikutnya bisa dimulai.")
+            else:
+                session.add_log(f"{interaction.user.display_name} siap resume ({ready}/{required}).")
+            await update_rummy_table_from_interaction(interaction, session)
+        except RummyGameError as error:
+            await reply_error(interaction, error)
+
+
 class RummyTournamentRoundFinishedView(discord.ui.View):
     def __init__(self, channel_id: int) -> None:
         super().__init__(timeout=None)
         self.channel_id = channel_id
+        try:
+            session = get_rummy_session(channel_id)
+        except RummyGameError:
+            session = None
+        if session is not None and session.tournament_resume_ready_required:
+            self.add_item(RummyResumeReadyButton(channel_id))
 
     @discord.ui.button(label="Mulai Ronde Berikutnya", style=discord.ButtonStyle.success)
     async def next_round(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:

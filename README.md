@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.2.2`
+Versi saat ini: `1.2.4`
 
 Command changelog:
 
@@ -310,6 +310,8 @@ Untuk tournament:
 ```
 
 Poker Tournament dan Rummy Tournament menyimpan checkpoint setelah ronde selesai. Ronde aktif yang terputus karena restart tidak dipulihkan; pemain mengulang ronde berikutnya dari checkpoint terakhir. Gunakan `rounds:0` atau dropdown **Endless** jika tournament ingin berjalan tanpa batas ronde.
+
+Setelah `/tournament-resume`, semua pemain yang terdaftar di tabel harus menekan **Siap Resume** pada panel sebelum **Mulai Ronde Berikutnya** bisa digunakan.
 
 Command pengelolaan tournament:
 

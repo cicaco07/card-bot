@@ -1,7 +1,7 @@
-"""Allow endless persistent tournaments.
+"""Store endless tournaments with zero total rounds.
 
-Revision ID: 20260604_01
-Revises: 20260602_01
+Revision ID: 20260604_02
+Revises: 20260604_01
 Create Date: 2026-06-04
 """
 
@@ -11,8 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "20260604_01"
-down_revision = "20260602_01"
+revision = "20260604_02"
+down_revision = "20260604_01"
 branch_labels = None
 depends_on = None
 
@@ -55,23 +55,23 @@ def downgrade() -> None:
         schema=SCHEMA,
         type_="check",
     )
-    op.execute(
-        f"""
-        UPDATE {SCHEMA}.tournament_tables
-        SET total_rounds = GREATEST(completed_rounds, 1)
-        WHERE total_rounds = 0
-        """
-    )
     op.alter_column(
         "tournament_tables",
         "total_rounds",
         schema=SCHEMA,
         existing_type=sa.Integer(),
-        nullable=False,
+        nullable=True,
+    )
+    op.execute(
+        f"""
+        UPDATE {SCHEMA}.tournament_tables
+        SET total_rounds = NULL
+        WHERE total_rounds = 0
+        """
     )
     op.create_check_constraint(
         "ck_tournament_tables_completed_rounds_lte_total",
         "tournament_tables",
-        "completed_rounds <= total_rounds",
+        "total_rounds IS NULL OR completed_rounds <= total_rounds",
         schema=SCHEMA,
     )

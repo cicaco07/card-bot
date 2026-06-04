@@ -6,12 +6,28 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.2.4 - 2026-06-04
+
+Koreksi penyimpanan endless tournament.
+
+- Menyimpan endless tournament sebagai `total_rounds = 0` di PostgreSQL/Supabase agar kompatibel dengan kolom `NOT NULL`.
+- Membaca `total_rounds = 0` kembali sebagai mode endless di dalam bot.
+- Memperbarui constraint database agar checkpoint endless tetap valid setelah ronde berjalan.
+
+## 1.2.3 - 2026-06-04
+
+Persetujuan pemain sebelum resume tournament.
+
+- Menahan tournament hasil `/tournament-resume` sampai semua pemain pada tabel menekan **Siap Resume**.
+- Menambahkan indikator kesiapan resume pada panel akhir ronde Poker dan Rummy.
+- Memblok tombol **Mulai Ronde Berikutnya** jika masih ada pemain yang belum siap.
+
 ## 1.2.2 - 2026-06-04
 
 Tournament endless berbasis checkpoint PostgreSQL.
 
 - Menambahkan opsi tournament **endless** untuk Poker dan Rummy.
-- Menyimpan endless tournament dengan `total_rounds` kosong di PostgreSQL/Supabase.
+- Menyimpan endless tournament dengan penanda khusus di PostgreSQL/Supabase.
 - Membiarkan tournament endless tetap berada di status `between_rounds` setelah tiap checkpoint sampai diarsipkan manual.
 - Menampilkan progress ronde endless pada lobby, panel game, hasil ronde, dan `/tournament-list`.
 

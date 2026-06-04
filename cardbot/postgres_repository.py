@@ -290,9 +290,20 @@ def _table_params(table: TournamentTableSnapshot) -> dict[str, Any]:
         "table_message_id": table.table_message_id,
         "owner_user_id": table.owner_user_id,
         "game_type": table.game_type,
-        "total_rounds": table.total_rounds,
+        "total_rounds": _db_total_rounds(table.total_rounds),
         "settings_json": json.dumps(table.settings),
     }
+
+
+def _db_total_rounds(total_rounds: int | None) -> int:
+    return 0 if total_rounds is None else int(total_rounds)
+
+
+def _session_total_rounds(total_rounds: Any) -> int | None:
+    if total_rounds is None:
+        return None
+    total = int(total_rounds)
+    return None if total == 0 else total
 
 
 def _asyncpg_url(database_url: str):
@@ -319,7 +330,7 @@ def _table_snapshot(
         owner_user_id=int(row["owner_user_id"]),
         game_type=str(row["game_type"]),
         status=str(row["status"]),
-        total_rounds=int(row["total_rounds"]) if row["total_rounds"] is not None else None,
+        total_rounds=_session_total_rounds(row["total_rounds"]),
         completed_rounds=int(row["completed_rounds"]),
         settings=dict(row["settings_json"]),
         players=[

@@ -7,6 +7,7 @@ import pytest
 import discord
 
 from cardbot.sessions import PokerSession, RummySession, find_poker_session
+from cardbot.postgres_repository import _table_params, _table_snapshot
 from cardbot.state import (
     register_poker_session,
     unregister_poker_session,
@@ -152,8 +153,14 @@ def test_poker_checkpoint_is_idempotent_and_resumes_between_rounds() -> None:
         assert resumed.game.status == PokerStatus.FINISHED
         assert resumed.tournament_current_round == 1
         assert resumed.tournament_scores == {1: 20, 2: -10}
+        assert resumed.tournament_resume_ready_required is True
+        with pytest.raises(Exception, match="Resume belum disetujui"):
+            resumed.start_next_tournament_round()
+        assert resumed.add_tournament_resume_ready(1) == (1, 2, False)
+        assert resumed.add_tournament_resume_ready(2) == (2, 2, True)
         resumed.start_next_tournament_round()
         assert resumed.tournament_current_round == 2
+        assert resumed.tournament_resume_ready_required is False
 
     asyncio.run(scenario())
 
@@ -218,8 +225,45 @@ def test_endless_poker_tournament_checkpoints_without_finishing() -> None:
         assert isinstance(resumed, PokerSession)
         assert resumed.tournament_total_rounds is None
         assert resumed.tournament_between_rounds is True
+        assert resumed.tournament_resume_ready_required is True
 
     asyncio.run(scenario())
+
+
+def test_postgres_repository_stores_endless_total_rounds_as_zero() -> None:
+    table = TournamentTableSnapshot(
+        table_id="11111111-1111-1111-1111-111111111111",
+        table_code="ABC123",
+        table_name=None,
+        guild_id=99,
+        channel_id=10,
+        table_message_id=None,
+        owner_user_id=1,
+        game_type="poker",
+        status="between_rounds",
+        total_rounds=None,
+        completed_rounds=0,
+    )
+    assert _table_params(table)["total_rounds"] == 0
+
+    restored = _table_snapshot(
+        {
+            "id": table.table_id,
+            "table_code": table.table_code,
+            "table_name": None,
+            "guild_id": table.guild_id,
+            "channel_id": table.channel_id,
+            "table_message_id": None,
+            "owner_user_id": table.owner_user_id,
+            "game_type": table.game_type,
+            "status": table.status,
+            "total_rounds": 0,
+            "completed_rounds": 12,
+            "settings_json": {},
+        }
+    )
+    assert restored.total_rounds is None
+    assert restored.completed_rounds == 12
 
 
 def test_rummy_checkpoint_restores_scores_without_active_hand() -> None:

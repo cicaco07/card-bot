@@ -75,6 +75,8 @@ class PokerSession:
     tournament_scored_rounds: set[int] = field(default_factory=set)
     tournament_checkpointed_rounds: set[int] = field(default_factory=set)
     tournament_checkpoint_error: str | None = None
+    tournament_resume_ready_required: bool = False
+    tournament_resume_ready_user_ids: set[int] = field(default_factory=set)
     tournament_aborted: bool = False
     game: PokerGame = field(default_factory=PokerGame)
     table_message_id: int | None = None
@@ -105,6 +107,36 @@ class PokerSession:
         votes = self.end_vote_count
         required = self.end_vote_required
         return votes, required, votes >= required
+
+    @property
+    def tournament_resume_ready_count(self) -> int:
+        player_ids = {player.user_id for player in self.game.players}
+        self.tournament_resume_ready_user_ids.intersection_update(player_ids)
+        return len(self.tournament_resume_ready_user_ids)
+
+    @property
+    def tournament_resume_ready_required_count(self) -> int:
+        return len(self.game.players)
+
+    @property
+    def tournament_resume_ready_complete(self) -> bool:
+        return self.tournament_resume_ready_count >= self.tournament_resume_ready_required_count
+
+    def add_tournament_resume_ready(self, user_id: int) -> tuple[int, int, bool]:
+        require_poker_player(self, user_id)
+        if not self.tournament_resume_ready_required:
+            raise PokerGameError("Tournament ini tidak sedang menunggu persetujuan resume.")
+        self.tournament_resume_ready_user_ids.add(user_id)
+        ready = self.tournament_resume_ready_count
+        required = self.tournament_resume_ready_required_count
+        return ready, required, ready >= required
+
+    def require_tournament_resume_ready(self) -> None:
+        if self.tournament_resume_ready_required and not self.tournament_resume_ready_complete:
+            raise PokerGameError(
+                f"Resume belum disetujui semua pemain ({self.tournament_resume_ready_count}/"
+                f"{self.tournament_resume_ready_required_count} siap)."
+            )
 
     @property
     def is_tournament(self) -> bool:
@@ -152,11 +184,14 @@ class PokerSession:
             raise PokerGameError("Tournament belum siap masuk ronde berikutnya.")
         if self.table_id and self.tournament_current_round not in self.tournament_checkpointed_rounds:
             raise PokerGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum melanjutkan.")
+        self.require_tournament_resume_ready()
 
         previous_players = [(player.user_id, player.name) for player in self.game.players]
         self.game = PokerGame()
         for user_id, name in previous_players:
             self.game.add_player(user_id, name)
+        self.tournament_resume_ready_required = False
+        self.tournament_resume_ready_user_ids.clear()
         return self.start_poker_round()
 
     def score_finished_tournament_round(self) -> list[str]:
@@ -234,6 +269,8 @@ class RummySession:
     tournament_scored_rounds: set[int] = field(default_factory=set)
     tournament_checkpointed_rounds: set[int] = field(default_factory=set)
     tournament_checkpoint_error: str | None = None
+    tournament_resume_ready_required: bool = False
+    tournament_resume_ready_user_ids: set[int] = field(default_factory=set)
     tournament_aborted: bool = False
     tournament_next_turn_direction: int = 1
     game: RummyGame = field(default_factory=RummyGame)
@@ -262,6 +299,36 @@ class RummySession:
         votes = self.end_vote_count
         required = self.end_vote_required
         return votes, required, votes >= required
+
+    @property
+    def tournament_resume_ready_count(self) -> int:
+        player_ids = {player.user_id for player in self.game.players}
+        self.tournament_resume_ready_user_ids.intersection_update(player_ids)
+        return len(self.tournament_resume_ready_user_ids)
+
+    @property
+    def tournament_resume_ready_required_count(self) -> int:
+        return len(self.game.players)
+
+    @property
+    def tournament_resume_ready_complete(self) -> bool:
+        return self.tournament_resume_ready_count >= self.tournament_resume_ready_required_count
+
+    def add_tournament_resume_ready(self, user_id: int) -> tuple[int, int, bool]:
+        require_rummy_player(self, user_id)
+        if not self.tournament_resume_ready_required:
+            raise RummyGameError("Tournament ini tidak sedang menunggu persetujuan resume.")
+        self.tournament_resume_ready_user_ids.add(user_id)
+        ready = self.tournament_resume_ready_count
+        required = self.tournament_resume_ready_required_count
+        return ready, required, ready >= required
+
+    def require_tournament_resume_ready(self) -> None:
+        if self.tournament_resume_ready_required and not self.tournament_resume_ready_complete:
+            raise RummyGameError(
+                f"Resume belum disetujui semua pemain ({self.tournament_resume_ready_count}/"
+                f"{self.tournament_resume_ready_required_count} siap)."
+            )
 
     @property
     def is_tournament(self) -> bool:
@@ -328,10 +395,13 @@ class RummySession:
             raise RummyGameError("Tournament belum siap masuk ronde berikutnya.")
         if self.table_id and self.tournament_current_round not in self.tournament_checkpointed_rounds:
             raise RummyGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum melanjutkan.")
+        self.require_tournament_resume_ready()
         players = [(player.user_id, player.name) for player in self.game.players]
         self.game = RummyGame()
         for user_id, name in players:
             self.game.add_player(user_id, name)
+        self.tournament_resume_ready_required = False
+        self.tournament_resume_ready_user_ids.clear()
         return self.start_rummy_round()
 
     def score_finished_tournament_round(self) -> list[str]:

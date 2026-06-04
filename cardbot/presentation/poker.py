@@ -34,6 +34,16 @@ def _persistent_table_text(session: PokerSession) -> str:
     return f"Kode meja: **`{session.table_code}`**{name}{checkpoint_error}\n"
 
 
+def _resume_ready_text(session: PokerSession) -> str:
+    if not session.tournament_resume_ready_required:
+        return ""
+    return (
+        f"\nKesiapan resume: **{session.tournament_resume_ready_count}/"
+        f"{session.tournament_resume_ready_required_count} siap**\n"
+        "Semua pemain harus menekan **Siap Resume** sebelum ronde berikutnya dimulai.\n"
+    )
+
+
 def poker_lobby_text(session: PokerSession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players)
     if not players:
@@ -131,6 +141,7 @@ def poker_finished_text(session: PokerSession) -> str:
                 f"Winner ronde: {winners}\n"
                 f"Loser ronde: {loser}\n\n"
                 f"{tournament_scoreboard_text(session)}\n\n"
+                f"{_resume_ready_text(session)}"
                 f"Log akhir:\n{log_text}\n\n"
                 "Tekan **Mulai Ronde Berikutnya** untuk lanjut."
             )

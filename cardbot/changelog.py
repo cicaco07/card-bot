@@ -7,12 +7,32 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.2.4",
+        "title": "Koreksi penyimpanan endless tournament",
+        "date": "2026-06-04",
+        "changes": [
+            "Menyimpan endless tournament sebagai total_rounds 0 di PostgreSQL/Supabase agar kompatibel dengan kolom NOT NULL.",
+            "Membaca total_rounds 0 kembali sebagai mode endless di dalam bot.",
+            "Memperbarui constraint database agar checkpoint endless tetap valid setelah ronde berjalan.",
+        ],
+    },
+    {
+        "version": "1.2.3",
+        "title": "Persetujuan pemain sebelum resume tournament",
+        "date": "2026-06-04",
+        "changes": [
+            "Menahan tournament hasil /tournament-resume sampai semua pemain pada tabel menekan Siap Resume.",
+            "Menambahkan indikator kesiapan resume pada panel akhir ronde Poker dan Rummy.",
+            "Memblok tombol Mulai Ronde Berikutnya jika masih ada pemain yang belum siap.",
+        ],
+    },
+    {
         "version": "1.2.2",
         "title": "Tournament endless berbasis checkpoint PostgreSQL",
         "date": "2026-06-04",
         "changes": [
             "Menambahkan opsi tournament endless untuk Poker dan Rummy.",
-            "Menyimpan endless tournament dengan total_rounds kosong di PostgreSQL/Supabase.",
+            "Menyimpan endless tournament dengan penanda khusus di PostgreSQL/Supabase.",
             "Membiarkan tournament endless tetap berada di status between_rounds setelah tiap checkpoint sampai diarsipkan manual.",
             "Menampilkan progress ronde endless pada lobby, panel game, hasil ronde, dan /tournament-list.",
         ],

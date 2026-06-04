@@ -33,6 +33,16 @@ def _persistent_table_text(session: RummySession) -> str:
     return f"Kode meja: **`{session.table_code}`**{name}{checkpoint_error}\n"
 
 
+def _resume_ready_text(session: RummySession) -> str:
+    if not session.tournament_resume_ready_required:
+        return ""
+    return (
+        f"\nKesiapan resume: **{session.tournament_resume_ready_count}/"
+        f"{session.tournament_resume_ready_required_count} siap**\n"
+        "Semua pemain harus menekan **Siap Resume** sebelum ronde berikutnya dimulai.\n"
+    )
+
+
 def rummy_lobby_text(session: RummySession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players) or "Belum ada pemain."
     mode = "Tournament" if session.is_tournament else "Regular"
@@ -101,7 +111,7 @@ def rummy_finished_text(session: RummySession) -> str:
         footer = "Tekan **Buat Lobby Baru** untuk main lagi."
     tournament = f"\n\n{rummy_scoreboard_text(session)}" if session.is_tournament else ""
     flipped_cards = _flipped_cards_text(state["flipped_cards"])
-    return f"**Rummy: Selesai**\n{_persistent_table_text(session)}\nSkor ronde:\n{scores}{tournament}\n\nPenalti flip card:\n{flipped_cards}\n\nLog akhir:\n{log}\n\n{footer}"
+    return f"**Rummy: Selesai**\n{_persistent_table_text(session)}\nSkor ronde:\n{scores}{tournament}\n{_resume_ready_text(session)}\nPenalti flip card:\n{flipped_cards}\n\nLog akhir:\n{log}\n\n{footer}"
 
 
 def _finished_score_text(user_id: int, score: int, details: dict[str, object] | None) -> str:

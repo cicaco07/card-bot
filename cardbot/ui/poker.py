@@ -382,10 +382,34 @@ class PokerFinishedView(discord.ui.View):
             await reply_error(interaction, error)
 
 
+class PokerResumeReadyButton(discord.ui.Button):
+    def __init__(self, channel_id: int) -> None:
+        self.channel_id = channel_id
+        super().__init__(label="Siap Resume", style=discord.ButtonStyle.primary)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        try:
+            session = get_poker_session(self.channel_id)
+            ready, required, complete = session.add_tournament_resume_ready(interaction.user.id)
+            if complete:
+                session.add_log("Semua pemain siap resume. Ronde berikutnya bisa dimulai.")
+            else:
+                session.add_log(f"{interaction.user.display_name} siap resume ({ready}/{required}).")
+            await update_poker_table_from_interaction(interaction, session)
+        except PokerGameError as error:
+            await reply_error(interaction, error)
+
+
 class PokerTournamentRoundFinishedView(discord.ui.View):
     def __init__(self, channel_id: int) -> None:
         super().__init__(timeout=None)
         self.channel_id = channel_id
+        try:
+            session = get_poker_session(channel_id)
+        except PokerGameError:
+            session = None
+        if session is not None and session.tournament_resume_ready_required:
+            self.add_item(PokerResumeReadyButton(channel_id))
 
     async def on_error(
         self,
