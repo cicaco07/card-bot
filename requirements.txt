@@ -5,6 +5,11 @@ CairoSVG>=2.7,<3
 SQLAlchemy>=2.0,<3
 asyncpg>=0.29,<1
 Alembic>=1.13,<2
+fastapi>=0.115,<1
+uvicorn>=0.32,<1
+Authlib>=1.3,<2
+httpx>=0.28,<1
+itsdangerous>=2.2,<3
 
 # Development dependencies (testing safety net for the clean-code refactor)
 pytest>=8,<10

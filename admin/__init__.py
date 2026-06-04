@@ -1,0 +1,1 @@
+"""CardBot admin applications."""

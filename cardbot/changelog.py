@@ -7,6 +7,16 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.3.0",
+        "title": "Web admin tournament berbasis Refine dan FastAPI",
+        "date": "2026-06-04",
+        "changes": [
+            "Menambahkan backend admin FastAPI untuk dashboard summary, list detail table tournament, archive table, dan player stats.",
+            "Menambahkan scaffold frontend Refine React TypeScript untuk login Discord, dashboard, table list, detail table, dan player stats.",
+            "Membatasi akses admin melalui Discord OAuth dan whitelist ADMIN_DISCORD_USER_IDS.",
+        ],
+    },
+    {
         "version": "1.2.4",
         "title": "Koreksi penyimpanan endless tournament",
         "date": "2026-06-04",

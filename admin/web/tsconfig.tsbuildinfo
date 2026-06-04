@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/authprovider.ts","./src/dataprovider.ts","./src/main.tsx","./src/rest.ts","./src/vite-env.d.ts","./src/pages/dashboard.tsx","./src/pages/login.tsx","./src/pages/player-stats.tsx","./src/pages/tournament-list.tsx","./src/pages/tournament-show.tsx"],"version":"6.0.3"}

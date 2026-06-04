@@ -6,6 +6,14 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.3.0 - 2026-06-04
+
+Web admin tournament berbasis Refine dan FastAPI.
+
+- Menambahkan backend admin FastAPI untuk dashboard summary, list detail table tournament, archive table, dan player stats.
+- Menambahkan scaffold frontend Refine React TypeScript untuk login Discord, dashboard, table list, detail table, dan player stats.
+- Membatasi akses admin melalui Discord OAuth dan whitelist `ADMIN_DISCORD_USER_IDS`.
+
 ## 1.2.4 - 2026-06-04
 
 Koreksi penyimpanan endless tournament.

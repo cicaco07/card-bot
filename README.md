@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.2.4`
+Versi saat ini: `1.3.0`
 
 Command changelog:
 
@@ -89,6 +89,17 @@ DATABASE_MIGRATION_URL=postgresql+asyncpg://cardbot:cardbot@localhost:5432/cardb
 
 `DATABASE_URL` dan `DATABASE_MIGRATION_URL` diperlukan untuk Poker Tournament dan Rummy Tournament persistent. Mode regular dan UNO tetap dapat berjalan jika database belum tersedia.
 
+Untuk web admin v1, tambahkan juga:
+
+```env
+ADMIN_SESSION_SECRET=ganti_dengan_secret_random
+ADMIN_DISCORD_USER_IDS=123456789012345678,987654321098765432
+DISCORD_CLIENT_ID=client_id_discord
+DISCORD_CLIENT_SECRET=client_secret_discord
+ADMIN_FRONTEND_URL=http://localhost:5173
+ADMIN_FRONTEND_ORIGIN=http://localhost:5173
+```
+
 Untuk mengambil `DISCORD_GUILD_ID`, aktifkan **Developer Mode** di Discord, klik kanan server kamu, lalu pilih **Copy Server ID**.
 
 3. Jalankan bot:
@@ -116,6 +127,31 @@ Supabase dapat dipakai sebagai PostgreSQL production tanpa Supabase SDK. Ambil c
 - Jalankan `python -m alembic upgrade head` sebelum menyalakan bot versi baru. Alembic otomatis membaca connection string dari `.env`.
 
 Jika terminal menampilkan `Bot logged in as ...`, bot sudah online. Coba command `/uno_start` di channel server.
+
+## Web Admin Tournament
+
+Web admin baru berada di folder `admin/` dan terbagi menjadi:
+
+- `admin/api` untuk backend FastAPI
+- `admin/web` untuk frontend Refine + React + TypeScript
+
+Jalankan backend admin:
+
+```bash
+python admin_api.py
+```
+
+Backend membaca `DATABASE_URL` yang sama dengan bot dan memakai Discord OAuth + whitelist `ADMIN_DISCORD_USER_IDS`.
+
+Jalankan frontend admin:
+
+```bash
+cd admin/web
+npm install
+npm run dev
+```
+
+Jika berbeda origin dari default, sesuaikan `ADMIN_FRONTEND_URL`, `ADMIN_FRONTEND_ORIGIN`, dan `VITE_ADMIN_API_URL`.
 
 ## Cara Main Dengan Tombol
 

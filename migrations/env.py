@@ -18,6 +18,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = None
+VERSION_TABLE = "alembic_version"
+APP_SCHEMA = "cardbot"
 
 
 def _database_url() -> str:
@@ -40,13 +42,36 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table=VERSION_TABLE,
+        version_table_schema=APP_SCHEMA,
+        include_schemas=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
+def _resolve_version_table_schema(connection) -> str:
+    result = connection.exec_driver_sql(
+        """
+        SELECT to_regclass('cardbot.alembic_version')::text AS cardbot_version,
+               to_regclass('public.alembic_version')::text AS public_version
+        """
+    ).mappings().one()
+    if result["cardbot_version"]:
+        return APP_SCHEMA
+    if result["public_version"]:
+        return "public"
+    return APP_SCHEMA
+
+
 def do_run_migrations(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table=VERSION_TABLE,
+        version_table_schema=_resolve_version_table_schema(connection),
+        include_schemas=True,
+    )
     with context.begin_transaction():
         context.run_migrations()
 
