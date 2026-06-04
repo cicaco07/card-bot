@@ -92,8 +92,11 @@ class SqlAdminDataService:
                             INNER JOIN cardbot.tournament_tables AS tables
                                 ON tables.id = players.table_id
                             WHERE players.user_id = stats.user_id
-                              AND tables.guild_id = stats.guild_id
-                            ORDER BY tables.updated_at DESC, players.seat_order ASC
+                            ORDER BY
+                                CASE WHEN tables.guild_id = stats.guild_id THEN 0 ELSE 1 END,
+                                tables.updated_at DESC,
+                                players.updated_at DESC,
+                                players.seat_order ASC
                             LIMIT 1
                         ) AS latest_player ON TRUE
                         ORDER BY total_score DESC, tournaments_won DESC, tournaments_played DESC
@@ -264,8 +267,11 @@ class SqlAdminDataService:
                 INNER JOIN cardbot.tournament_tables AS tables
                     ON tables.id = players.table_id
                 WHERE players.user_id = stats.user_id
-                  AND tables.guild_id = stats.guild_id
-                ORDER BY tables.updated_at DESC, players.seat_order ASC
+                ORDER BY
+                    CASE WHEN tables.guild_id = stats.guild_id THEN 0 ELSE 1 END,
+                    tables.updated_at DESC,
+                    players.updated_at DESC,
+                    players.seat_order ASC
                 LIMIT 1
             ) AS latest_player ON TRUE
             {clause}

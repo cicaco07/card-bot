@@ -66,10 +66,7 @@ export function TournamentShowPage() {
             <Descriptions.Item label="Guild">{detail.table.guild_id}</Descriptions.Item>
             <Descriptions.Item label="Channel">{detail.table.channel_id}</Descriptions.Item>
             <Descriptions.Item label="Owner">
-              <div className="dashboard-player-cell">
-                <span className="dashboard-player-name">{detail.table.owner_display_name || "Unknown Player"}</span>
-                <span className="dashboard-user-id">{detail.table.owner_user_id}</span>
-              </div>
+              <span className="dashboard-player-name">{detail.table.owner_display_name || `User ${detail.table.owner_user_id}`}</span>
             </Descriptions.Item>
             <Descriptions.Item label="Updated">{new Date(detail.table.updated_at).toLocaleString()}</Descriptions.Item>
           </Descriptions>
@@ -90,10 +87,7 @@ export function TournamentShowPage() {
                 title: "Player",
                 key: "player",
                 render: (_: unknown, record: TableDetail["players"][number]) => (
-                  <div className="dashboard-player-cell">
-                    <span className="dashboard-player-name">{record.display_name || "Unknown Player"}</span>
-                    <span className="dashboard-user-id">{record.user_id}</span>
-                  </div>
+                  <span className="dashboard-player-name">{record.display_name || `User ${record.user_id}`}</span>
                 ),
               },
               { title: "Score", dataIndex: "cumulative_score" },

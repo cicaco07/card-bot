@@ -90,10 +90,7 @@ export function DashboardPage() {
                   title: "Player",
                   key: "player",
                   render: (_: unknown, record: PlayerStat) => (
-                    <div className="dashboard-player-cell">
-                      <span className="dashboard-player-name">{record.display_name || "Unknown Player"}</span>
-                      <span className="dashboard-user-id">{record.user_id}</span>
-                    </div>
+                    <span className="dashboard-player-name">{record.display_name || `User ${record.user_id}`}</span>
                   ),
                 },
                 { title: "Mode", dataIndex: "game_type" },

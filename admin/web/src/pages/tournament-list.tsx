@@ -53,10 +53,7 @@ export function TournamentListPage() {
       title: "Owner",
       key: "owner",
       render: (_: unknown, record: TournamentTable) => (
-        <div className="dashboard-player-cell">
-          <span className="dashboard-player-name">{record.owner_display_name || "Unknown Player"}</span>
-          <span className="dashboard-user-id">{record.owner_user_id}</span>
-        </div>
+        <span className="dashboard-player-name">{record.owner_display_name || `User ${record.owner_user_id}`}</span>
       ),
     },
     { title: "Guild", dataIndex: "guild_id" },
