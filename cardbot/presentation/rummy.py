@@ -25,6 +25,14 @@ def rummy_scoreboard_text(session: RummySession) -> str:
     return "Skor tournament:\n" + "\n".join(rows)
 
 
+def _persistent_table_text(session: RummySession) -> str:
+    if not session.table_code:
+        return ""
+    name = f" - {session.table_name}" if session.table_name else ""
+    checkpoint_error = f"\nCheckpoint bermasalah: **{session.tournament_checkpoint_error}**" if session.tournament_checkpoint_error else ""
+    return f"Kode meja: **`{session.table_code}`**{name}{checkpoint_error}\n"
+
+
 def rummy_lobby_text(session: RummySession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players) or "Belum ada pemain."
     mode = "Tournament" if session.is_tournament else "Regular"
@@ -33,6 +41,7 @@ def rummy_lobby_text(session: RummySession) -> str:
         "**Rummy: Lobby**\n"
         "Buat meld run atau set, lalu raih skor tertinggi.\n\n"
         f"Owner: {mention(session.owner_id)}\nMode: **{mode}**\n{rounds}"
+        f"{_persistent_table_text(session)}"
         f"Pemain ({len(session.game.players)}/{session.game.max_players}):\n{players}"
     )
 
@@ -64,6 +73,7 @@ def rummy_state_text(session: RummySession) -> str:
     top_discard_owner = state["visible_discard_user_ids"][0] if state["visible_discard_user_ids"] else None
     return (
         "**Rummy: Game Berjalan**\n"
+        f"{_persistent_table_text(session)}"
         f"{tournament}Gilirannya: {mention(state['current_player_id'])}\n"
         f"Arah giliran: **{state['direction']}**\n"
         f"Fase giliran: **{state['phase']}**\n"
@@ -92,7 +102,7 @@ def rummy_finished_text(session: RummySession) -> str:
         footer = "Tekan **Buat Lobby Baru** untuk main lagi."
     tournament = f"\n\n{rummy_scoreboard_text(session)}" if session.is_tournament else ""
     flipped_cards = _flipped_cards_text(state["flipped_cards"])
-    return f"**Rummy: Selesai**\n\nSkor ronde:\n{scores}{tournament}\n\nPenalti flip card:\n{flipped_cards}\n\nLog akhir:\n{log}\n\n{footer}"
+    return f"**Rummy: Selesai**\n{_persistent_table_text(session)}\nSkor ronde:\n{scores}{tournament}\n\nPenalti flip card:\n{flipped_cards}\n\nLog akhir:\n{log}\n\n{footer}"
 
 
 def _finished_score_text(user_id: int, score: int, details: dict[str, object] | None) -> str:

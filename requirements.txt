@@ -2,6 +2,9 @@ discord.py>=2.4,<3
 python-dotenv>=1.0,<2
 Pillow>=10,<13
 CairoSVG>=2.7,<3
+SQLAlchemy>=2.0,<3
+asyncpg>=0.29,<1
+Alembic>=1.13,<2
 
 # Development dependencies (testing safety net for the clean-code refactor)
 pytest>=8,<10

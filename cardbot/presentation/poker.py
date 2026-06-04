@@ -26,6 +26,14 @@ def tournament_scoreboard_text(session: PokerSession) -> str:
     return "Skor tournament:\n" + "\n".join(rows)
 
 
+def _persistent_table_text(session: PokerSession) -> str:
+    if not session.table_code:
+        return ""
+    name = f" - {session.table_name}" if session.table_name else ""
+    checkpoint_error = f"\nCheckpoint bermasalah: **{session.tournament_checkpoint_error}**" if session.tournament_checkpoint_error else ""
+    return f"Kode meja: **`{session.table_code}`**{name}{checkpoint_error}\n"
+
+
 def poker_lobby_text(session: PokerSession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players)
     if not players:
@@ -38,6 +46,7 @@ def poker_lobby_text(session: PokerSession) -> str:
         "**Remi Poker: Lobby**\n"
         "Mode ini memakai rules Big Two style: habiskan kartu, jangan menjadi loser.\n\n"
         f"Owner: {mention(session.owner_id)}\n"
+        f"{_persistent_table_text(session)}"
         f"Mode: **{mode_text}**\n"
         f"{tournament_text}"
         f"Timer auto-pass: **{session.timer_seconds} detik**\n"
@@ -78,6 +87,7 @@ def poker_state_text(session: PokerSession) -> str:
 
     return (
         "**Remi Poker: Game Berjalan**\n"
+        f"{_persistent_table_text(session)}"
         f"{tournament_header}"
         f"Gilirannya: {current_player}\n"
         f"Timer auto-pass: **{session.timer_seconds} detik**\n"
@@ -104,6 +114,7 @@ def poker_finished_text(session: PokerSession) -> str:
         if session.tournament_aborted:
             return (
                 "**Remi Poker Tournament: Dihentikan**\n"
+                f"{_persistent_table_text(session)}"
                 f"Ronde terakhir: {session.tournament_current_round}/{session.tournament_total_rounds}\n\n"
                 f"{tournament_scoreboard_text(session)}\n\n"
                 f"Log akhir:\n{log_text}\n\n"
@@ -112,6 +123,7 @@ def poker_finished_text(session: PokerSession) -> str:
         if not session.tournament_finished:
             return (
                 "**Remi Poker Tournament: Ronde Selesai**\n"
+                f"{_persistent_table_text(session)}"
                 f"Ronde selesai: {session.tournament_current_round}/{session.tournament_total_rounds}\n"
                 f"Winner ronde: {winners}\n"
                 f"Loser ronde: {loser}\n\n"
@@ -123,6 +135,7 @@ def poker_finished_text(session: PokerSession) -> str:
         champion_text = mention(champion[0]) if champion else "Tidak ada"
         return (
             "**Remi Poker Tournament: Selesai**\n"
+            f"{_persistent_table_text(session)}"
             f"Total ronde: {session.tournament_total_rounds}\n"
             f"Champion: {champion_text}\n\n"
             f"{tournament_scoreboard_text(session)}\n\n"

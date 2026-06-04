@@ -13,7 +13,15 @@ from rummy.game import RummyGame, RummyGameError, RummyStatus
 from uno.game import UnoGame, UnoGameError
 
 from .constants import POKER_TOURNAMENT_POINTS
-from .state import poker_sessions_by_channel, rummy_sessions_by_channel, sessions_by_channel
+from .state import (
+    poker_sessions_by_channel,
+    poker_tournament_session_by_code,
+    poker_tournament_sessions_by_id,
+    rummy_sessions_by_channel,
+    rummy_tournament_session_by_code,
+    rummy_tournament_sessions_by_id,
+    sessions_by_channel,
+)
 from .text_utils import format_tournament_round_summary
 
 
@@ -54,12 +62,19 @@ class UnoSession:
 class PokerSession:
     channel_id: int
     owner_id: int
+    guild_id: int | None = None
+    table_id: str | None = None
+    table_code: str | None = None
+    table_name: str | None = None
     mode: str = "regular"
     tournament_total_rounds: int = 3
     tournament_current_round: int = 0
     tournament_scores: dict[int, int] = field(default_factory=dict)
     tournament_round_summaries: list[str] = field(default_factory=list)
+    tournament_round_points: dict[int, dict[int, int]] = field(default_factory=dict)
     tournament_scored_rounds: set[int] = field(default_factory=set)
+    tournament_checkpointed_rounds: set[int] = field(default_factory=set)
+    tournament_checkpoint_error: str | None = None
     tournament_aborted: bool = False
     game: PokerGame = field(default_factory=PokerGame)
     table_message_id: int | None = None
@@ -108,6 +123,14 @@ class PokerSession:
             and not self.tournament_aborted
         )
 
+    @property
+    def runtime_key(self) -> int | str:
+        return self.table_id or self.channel_id
+
+    @property
+    def tournament_game_type(self) -> str:
+        return "poker"
+
     def start_poker_round(self) -> list[str]:
         if not self.is_tournament:
             return self.game.start()
@@ -122,6 +145,8 @@ class PokerSession:
     def start_next_tournament_round(self) -> list[str]:
         if not self.tournament_between_rounds:
             raise PokerGameError("Tournament belum siap masuk ronde berikutnya.")
+        if self.table_id and self.tournament_current_round not in self.tournament_checkpointed_rounds:
+            raise PokerGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum melanjutkan.")
 
         previous_players = [(player.user_id, player.name) for player in self.game.players]
         self.game = PokerGame()
@@ -166,21 +191,44 @@ class PokerSession:
             round_points.append((user_id, points))
 
         self.tournament_scored_rounds.add(self.tournament_current_round)
+        self.tournament_round_points[self.tournament_current_round] = dict(round_points)
         summary = format_tournament_round_summary(self.tournament_current_round, round_points)
         self.tournament_round_summaries.append(summary)
         return [summary]
+
+    def finished_round_payload(self) -> dict[str, object]:
+        ranking = list(self.game.winner_ids)
+        if self.game.loser_id is not None and self.game.loser_id not in ranking:
+            ranking.append(self.game.loser_id)
+        ranking.extend(player.user_id for player in self.game.players if player.user_id not in ranking)
+        return {
+            "summary": self.tournament_round_summaries[-1],
+            "round_points": dict(self.tournament_round_points[self.tournament_current_round]),
+            "winner_ids": list(self.game.winner_ids),
+            "loser_id": self.game.loser_id,
+            "ranking": ranking,
+            "bomb_finish_bomber_id": self.game.bomb_finish_bomber_id,
+            "bomb_finish_loser_id": self.game.bomb_finish_loser_id,
+        }
 
 
 @dataclass
 class RummySession:
     channel_id: int
     owner_id: int
+    guild_id: int | None = None
+    table_id: str | None = None
+    table_code: str | None = None
+    table_name: str | None = None
     mode: str = "regular"
     tournament_total_rounds: int = 3
     tournament_current_round: int = 0
     tournament_scores: dict[int, int] = field(default_factory=dict)
     tournament_round_summaries: list[str] = field(default_factory=list)
+    tournament_round_points: dict[int, dict[int, int]] = field(default_factory=dict)
     tournament_scored_rounds: set[int] = field(default_factory=set)
+    tournament_checkpointed_rounds: set[int] = field(default_factory=set)
+    tournament_checkpoint_error: str | None = None
     tournament_aborted: bool = False
     tournament_next_turn_direction: int = 1
     game: RummyGame = field(default_factory=RummyGame)
@@ -227,6 +275,14 @@ class RummySession:
             and not self.tournament_aborted
         )
 
+    @property
+    def runtime_key(self) -> int | str:
+        return self.table_id or self.channel_id
+
+    @property
+    def tournament_game_type(self) -> str:
+        return "rummy"
+
     def start_rummy_round(self) -> list[str]:
         if not self.is_tournament:
             return self.game.start()
@@ -260,6 +316,8 @@ class RummySession:
     def start_next_tournament_round(self) -> list[str]:
         if not self.tournament_between_rounds:
             raise RummyGameError("Tournament belum siap masuk ronde berikutnya.")
+        if self.table_id and self.tournament_current_round not in self.tournament_checkpointed_rounds:
+            raise RummyGameError("Checkpoint ronde belum tersimpan. Tekan Coba Simpan Checkpoint sebelum melanjutkan.")
         players = [(player.user_id, player.name) for player in self.game.players]
         self.game = RummyGame()
         for user_id, name in players:
@@ -279,9 +337,19 @@ class RummySession:
             self.tournament_scores[user_id] = self.tournament_scores.get(user_id, 0) + points
         self.tournament_next_turn_direction = -1 if self.game.has_flip_penalty else 1
         self.tournament_scored_rounds.add(self.tournament_current_round)
+        self.tournament_round_points[self.tournament_current_round] = dict(round_points)
         summary = format_tournament_round_summary(self.tournament_current_round, round_points)
         self.tournament_round_summaries.append(summary)
         return [summary]
+
+    def finished_round_payload(self) -> dict[str, object]:
+        return {
+            "summary": self.tournament_round_summaries[-1],
+            "round_points": dict(self.game.scores),
+            "score_breakdowns": self.game.public_state()["score_breakdowns"],
+            "closed_user_id": self.game.closed_user_id,
+            "closed_card": self.game.closed_card.activity_label if self.game.closed_card else None,
+        }
 
 
 def require_channel_id(interaction: discord.Interaction) -> int:
@@ -299,22 +367,70 @@ def get_session(channel_id: int | None) -> UnoSession:
     return session
 
 
-def get_poker_session(channel_id: int | None) -> PokerSession:
-    if channel_id is None:
+def get_poker_session(session_key: int | str | None) -> PokerSession:
+    if session_key is None:
         raise PokerGameError("Command ini harus dipakai di channel server.")
-    session = poker_sessions_by_channel.get(channel_id)
+    session = (
+        poker_tournament_sessions_by_id.get(session_key)
+        if isinstance(session_key, str)
+        else poker_sessions_by_channel.get(session_key)
+    )
     if session is None:
         raise PokerGameError("Belum ada meja remi poker di channel ini. Gunakan /poker-start.")
     return session
 
 
-def get_rummy_session(channel_id: int | None) -> RummySession:
-    if channel_id is None:
+def get_rummy_session(session_key: int | str | None) -> RummySession:
+    if session_key is None:
         raise RummyGameError("Command ini harus dipakai di channel server.")
-    session = rummy_sessions_by_channel.get(channel_id)
+    session = (
+        rummy_tournament_sessions_by_id.get(session_key)
+        if isinstance(session_key, str)
+        else rummy_sessions_by_channel.get(session_key)
+    )
     if session is None:
         raise RummyGameError("Belum ada meja rummy di channel ini. Gunakan /rummy-start.")
     return session
+
+
+def find_poker_session(channel_id: int | None, guild_id: int | None, table_code: str | None = None) -> PokerSession:
+    if channel_id is None:
+        raise PokerGameError("Command ini harus dipakai di channel server.")
+    if table_code:
+        if guild_id is None:
+            raise PokerGameError("Kode meja tournament hanya bisa dipakai di server.")
+        session = poker_tournament_session_by_code(guild_id, table_code)
+        if session is None:
+            raise PokerGameError("Meja Remi Poker tournament dengan kode tersebut belum aktif. Gunakan /tournament-resume.")
+        return session
+    regular = poker_sessions_by_channel.get(channel_id)
+    tournaments = [session for session in poker_tournament_sessions_by_id.values() if session.channel_id == channel_id]
+    candidates = ([regular] if regular else []) + tournaments
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        raise PokerGameError("Ada beberapa meja Poker di channel ini. Isi table_code untuk memilih meja tournament.")
+    raise PokerGameError("Belum ada meja remi poker di channel ini. Gunakan /poker-start.")
+
+
+def find_rummy_session(channel_id: int | None, guild_id: int | None, table_code: str | None = None) -> RummySession:
+    if channel_id is None:
+        raise RummyGameError("Command ini harus dipakai di channel server.")
+    if table_code:
+        if guild_id is None:
+            raise RummyGameError("Kode meja tournament hanya bisa dipakai di server.")
+        session = rummy_tournament_session_by_code(guild_id, table_code)
+        if session is None:
+            raise RummyGameError("Meja Rummy tournament dengan kode tersebut belum aktif. Gunakan /tournament-resume.")
+        return session
+    regular = rummy_sessions_by_channel.get(channel_id)
+    tournaments = [session for session in rummy_tournament_sessions_by_id.values() if session.channel_id == channel_id]
+    candidates = ([regular] if regular else []) + tournaments
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
+        raise RummyGameError("Ada beberapa meja Rummy di channel ini. Isi table_code untuk memilih meja tournament.")
+    raise RummyGameError("Belum ada meja rummy di channel ini. Gunakan /rummy-start.")
 
 
 def require_session_player(session: UnoSession, user_id: int) -> None:

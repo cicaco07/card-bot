@@ -7,6 +7,18 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.2.0",
+        "title": "Multi-table tournament dan checkpoint PostgreSQL",
+        "date": "2026-06-02",
+        "changes": [
+            "Menambahkan multi-table untuk Poker Tournament dan Rummy Tournament dengan kode meja unik.",
+            "Menyimpan checkpoint PostgreSQL setelah ronde tournament selesai dan mendukung resume manual dari ronde berikutnya.",
+            "Menambahkan command /tournament-list, /tournament-resume, dan /tournament-archive.",
+            "Mendukung PostgreSQL lokal melalui Docker Compose serta connection string Supabase untuk deployment.",
+            "Mempertahankan tombol Mulai Ronde Berikutnya pada panel akhir ronde setelah checkpoint berhasil tersimpan.",
+        ],
+    },
+    {
         "version": "1.1.16",
         "title": "Transfer bonus flip card Rummy",
         "date": "2026-06-03",
