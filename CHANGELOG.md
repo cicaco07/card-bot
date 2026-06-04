@@ -6,6 +6,13 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.2.1 - 2026-06-04
+
+Emoji suit publik Remi Poker.
+
+- Mengganti label kartu publik Remi Poker menjadi format ringkas dengan emoji suit, misalnya `K ♦️`.
+- Menyamakan tampilan log aksi, kombinasi terakhir, dropdown kartu, dan kartu 3 penentu giliran dengan format Rummy.
+
 ## 1.2.0 - 2026-06-02
 
 Multi-table tournament dan checkpoint PostgreSQL.
