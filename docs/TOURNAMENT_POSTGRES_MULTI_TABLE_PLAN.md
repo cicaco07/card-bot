@@ -158,7 +158,7 @@ Semua tabel milik bot ditempatkan pada schema PostgreSQL `cardbot`, bukan schema
 | `owner_user_id` | `bigint` | Pembuat meja |
 | `game_type` | enum | `poker` atau `rummy` |
 | `status` | enum | `between_rounds`, `finished`, atau `archived` |
-| `total_rounds` | `integer` | Target jumlah ronde |
+| `total_rounds` | `integer nullable` | Target jumlah ronde; `NULL` berarti tournament endless |
 | `completed_rounds` | `integer` | Jumlah ronde yang sudah tersimpan |
 | `settings_json` | `jsonb` | Konfigurasi mode yang stabil antar ronde |
 | `version` | `integer` | Optimistic locking |
@@ -169,7 +169,7 @@ Constraint penting:
 
 - Unique `(guild_id, table_code)`.
 - `completed_rounds >= 0`.
-- `completed_rounds <= total_rounds`.
+- `completed_rounds <= total_rounds` jika `total_rounds` tidak `NULL`.
 
 Tidak perlu status `in_round` di database. Ketika ronde aktif berjalan di memory, database tetap menyimpan checkpoint `between_rounds` terakhir.
 

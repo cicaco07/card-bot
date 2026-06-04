@@ -8,7 +8,7 @@ from poker.assets import render_play_image, render_poker_hand_image
 from poker.game import PokerGame, PokerStatus
 
 from ..sessions import PokerSession
-from ..text_utils import mention
+from ..text_utils import format_tournament_round_count, format_tournament_round_progress, mention
 
 
 def tournament_scoreboard_text(session: PokerSession) -> str:
@@ -41,7 +41,7 @@ def poker_lobby_text(session: PokerSession) -> str:
     mode_text = "Tournament" if session.is_tournament else "Regular"
     tournament_text = ""
     if session.is_tournament:
-        tournament_text = f"Jumlah ronde tournament: **{session.tournament_total_rounds} game**\n"
+        tournament_text = f"Jumlah ronde tournament: **{format_tournament_round_count(session.tournament_total_rounds)}**\n"
     return (
         "**Remi Poker: Lobby**\n"
         "Mode ini memakai rules Big Two style: habiskan kartu, jangan menjadi loser.\n\n"
@@ -82,7 +82,8 @@ def poker_state_text(session: PokerSession) -> str:
     tournament_header = ""
     tournament_scores = ""
     if session.is_tournament:
-        tournament_header = f"Mode: **Tournament ronde {session.tournament_current_round}/{session.tournament_total_rounds}**\n"
+        progress = format_tournament_round_progress(session.tournament_current_round, session.tournament_total_rounds)
+        tournament_header = f"Mode: **Tournament ronde {progress}**\n"
         tournament_scores = f"\n\n{tournament_scoreboard_text(session)}"
 
     return (
@@ -112,19 +113,21 @@ def poker_finished_text(session: PokerSession) -> str:
     log_text = "\n".join(f"- {message}" for message in session.log[-3:]) or "- Game selesai."
     if session.is_tournament:
         if session.tournament_aborted:
+            progress = format_tournament_round_progress(session.tournament_current_round, session.tournament_total_rounds)
             return (
                 "**Remi Poker Tournament: Dihentikan**\n"
                 f"{_persistent_table_text(session)}"
-                f"Ronde terakhir: {session.tournament_current_round}/{session.tournament_total_rounds}\n\n"
+                f"Ronde terakhir: {progress}\n\n"
                 f"{tournament_scoreboard_text(session)}\n\n"
                 f"Log akhir:\n{log_text}\n\n"
                 "Tekan **Buat Lobby Baru** untuk main lagi."
             )
         if not session.tournament_finished:
+            progress = format_tournament_round_progress(session.tournament_current_round, session.tournament_total_rounds)
             return (
                 "**Remi Poker Tournament: Ronde Selesai**\n"
                 f"{_persistent_table_text(session)}"
-                f"Ronde selesai: {session.tournament_current_round}/{session.tournament_total_rounds}\n"
+                f"Ronde selesai: {progress}\n"
                 f"Winner ronde: {winners}\n"
                 f"Loser ronde: {loser}\n\n"
                 f"{tournament_scoreboard_text(session)}\n\n"
@@ -136,7 +139,7 @@ def poker_finished_text(session: PokerSession) -> str:
         return (
             "**Remi Poker Tournament: Selesai**\n"
             f"{_persistent_table_text(session)}"
-            f"Total ronde: {session.tournament_total_rounds}\n"
+            f"Total ronde: {format_tournament_round_count(session.tournament_total_rounds)}\n"
             f"Champion: {champion_text}\n\n"
             f"{tournament_scoreboard_text(session)}\n\n"
             f"Log akhir:\n{log_text}\n\n"
@@ -179,7 +182,7 @@ def poker_rules_embed() -> discord.Embed:
     embed.add_field(
         name="Mode Tournament",
         value=(
-            "Regular bermain 1 game. Tournament bermain 3-20 ronde dengan akumulasi point: "
+            "Regular bermain 1 game. Tournament bermain 3-20 ronde atau endless dengan akumulasi point: "
             "winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10. "
             "Jika ronde selesai karena bombcard, bomber final +40 dan korban bomb -40."
         ),

@@ -198,7 +198,7 @@ class PokerModeSelect(discord.ui.Select):
             discord.SelectOption(
                 label="Tournament",
                 value="tournament",
-                description="Main 3-20 ronde dengan akumulasi point",
+                description="Main 3-20 ronde atau endless dengan akumulasi point",
                 default=session.is_tournament,
             ),
         ]
@@ -217,7 +217,8 @@ class PokerModeSelect(discord.ui.Select):
                 raise PokerGameError("Mode hanya bisa diubah saat lobby belum mulai.")
             await _change_poker_mode(session, interaction, self.values[0])
             if session.is_tournament:
-                session.tournament_total_rounds = max(3, session.tournament_total_rounds)
+                if session.tournament_total_rounds is not None:
+                    session.tournament_total_rounds = max(3, session.tournament_total_rounds)
                 session.add_log("Mode diubah ke Tournament.")
             else:
                 session.tournament_current_round = 0
@@ -236,11 +237,20 @@ class PokerModeSelect(discord.ui.Select):
 class PokerTournamentRoundSelect(discord.ui.Select):
     def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
+        session = get_poker_session(channel_id)
         options = [
+            discord.SelectOption(
+                label="Endless",
+                value="endless",
+                description="Lanjut terus selama checkpoint ronde tersimpan",
+                default=session.tournament_total_rounds is None,
+            ),
+        ] + [
             discord.SelectOption(
                 label=f"{round_count} ronde",
                 value=str(round_count),
                 description="Jumlah game dalam tournament",
+                default=session.tournament_total_rounds == round_count,
             )
             for round_count in range(3, 21)
         ]
@@ -259,9 +269,10 @@ class PokerTournamentRoundSelect(discord.ui.Select):
                 raise PokerGameError("Jumlah ronde hanya dipakai untuk mode tournament.")
             if session.game.status != PokerStatus.WAITING:
                 raise PokerGameError("Jumlah ronde hanya bisa diubah saat lobby belum mulai.")
-            session.tournament_total_rounds = int(self.values[0])
+            session.tournament_total_rounds = None if self.values[0] == "endless" else int(self.values[0])
             await _sync_poker_lobby(session)
-            session.add_log(f"Jumlah ronde tournament diatur ke {session.tournament_total_rounds}.")
+            rounds_text = "endless" if session.tournament_total_rounds is None else str(session.tournament_total_rounds)
+            session.add_log(f"Jumlah ronde tournament diatur ke {rounds_text}.")
             await update_poker_table_from_interaction(interaction, session)
         except PokerGameError as error:
             await reply_error(interaction, error)

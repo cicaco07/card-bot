@@ -73,7 +73,7 @@ Tidak masuk MVP:
 
 Tambahan setelah MVP:
 
-- Mode tournament memakai rules regular yang sama, tetapi bermain 3-20 ronde.
+- Mode tournament memakai rules regular yang sama, tetapi bermain 3-20 ronde atau endless.
 - Skor tournament per ronde: pemenang pertama +20, pemenang berikutnya +10, posisi tengah +0, loser terakhir -10.
 - Setelah ronde selesai, meja menampilkan scoreboard dan tombol `Mulai Ronde Berikutnya`.
 

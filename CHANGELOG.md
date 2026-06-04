@@ -6,6 +6,15 @@ Format versi memakai `major.feature.patch`.
 - `feature`: penambahan fitur/mode baru.
 - `patch`: update minor, balancing, atau bugfix.
 
+## 1.2.2 - 2026-06-04
+
+Tournament endless berbasis checkpoint PostgreSQL.
+
+- Menambahkan opsi tournament **endless** untuk Poker dan Rummy.
+- Menyimpan endless tournament dengan `total_rounds` kosong di PostgreSQL/Supabase.
+- Membiarkan tournament endless tetap berada di status `between_rounds` setelah tiap checkpoint sampai diarsipkan manual.
+- Menampilkan progress ronde endless pada lobby, panel game, hasil ronde, dan `/tournament-list`.
+
 ## 1.2.1 - 2026-06-04
 
 Emoji suit publik Remi Poker.

@@ -110,7 +110,7 @@ Joker       = -250
 
 Regular memainkan satu ronde.
 
-Tournament memainkan 3-20 ronde:
+Tournament memainkan 3-20 ronde atau endless:
 
 - Score tiap ronde diakumulasikan.
 - Setelah ronde selesai muncul tombol **Mulai Ronde Berikutnya**.

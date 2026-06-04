@@ -22,7 +22,7 @@ from .state import (
     rummy_tournament_sessions_by_id,
     sessions_by_channel,
 )
-from .text_utils import format_tournament_round_summary
+from .text_utils import format_tournament_round_progress, format_tournament_round_summary
 
 
 @dataclass
@@ -67,7 +67,7 @@ class PokerSession:
     table_code: str | None = None
     table_name: str | None = None
     mode: str = "regular"
-    tournament_total_rounds: int = 3
+    tournament_total_rounds: int | None = 3
     tournament_current_round: int = 0
     tournament_scores: dict[int, int] = field(default_factory=dict)
     tournament_round_summaries: list[str] = field(default_factory=list)
@@ -112,7 +112,11 @@ class PokerSession:
 
     @property
     def tournament_finished(self) -> bool:
-        return self.is_tournament and len(self.tournament_scored_rounds) >= self.tournament_total_rounds
+        return (
+            self.is_tournament
+            and self.tournament_total_rounds is not None
+            and len(self.tournament_scored_rounds) >= self.tournament_total_rounds
+        )
 
     @property
     def tournament_between_rounds(self) -> bool:
@@ -140,7 +144,8 @@ class PokerSession:
         if not self.tournament_scores:
             self.tournament_scores = {player.user_id: 0 for player in self.game.players}
         messages = self.game.start()
-        return [f"Ronde tournament {self.tournament_current_round}/{self.tournament_total_rounds} dimulai."] + messages
+        progress = format_tournament_round_progress(self.tournament_current_round, self.tournament_total_rounds)
+        return [f"Ronde tournament {progress} dimulai."] + messages
 
     def start_next_tournament_round(self) -> list[str]:
         if not self.tournament_between_rounds:
@@ -221,7 +226,7 @@ class RummySession:
     table_code: str | None = None
     table_name: str | None = None
     mode: str = "regular"
-    tournament_total_rounds: int = 3
+    tournament_total_rounds: int | None = 3
     tournament_current_round: int = 0
     tournament_scores: dict[int, int] = field(default_factory=dict)
     tournament_round_summaries: list[str] = field(default_factory=list)
@@ -264,7 +269,11 @@ class RummySession:
 
     @property
     def tournament_finished(self) -> bool:
-        return self.is_tournament and len(self.tournament_scored_rounds) >= self.tournament_total_rounds
+        return (
+            self.is_tournament
+            and self.tournament_total_rounds is not None
+            and len(self.tournament_scored_rounds) >= self.tournament_total_rounds
+        )
 
     @property
     def tournament_between_rounds(self) -> bool:
@@ -307,8 +316,9 @@ class RummySession:
         messages = self.game.start(starting_user_id=starting_user_id, turn_direction=turn_direction)
         self.tournament_current_round = round_number
         direction = "searah jarum jam" if turn_direction == 1 else "berlawanan arah jarum jam"
+        progress = format_tournament_round_progress(self.tournament_current_round, self.tournament_total_rounds)
         return [
-            f"Ronde tournament {self.tournament_current_round}/{self.tournament_total_rounds} dimulai.",
+            f"Ronde tournament {progress} dimulai.",
             f"Arah giliran ronde: {direction}.",
             *messages,
         ]

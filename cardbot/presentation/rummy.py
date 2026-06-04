@@ -10,7 +10,7 @@ from rummy.assets import render_discard_pile_image, render_rummy_hand_image
 from rummy.game import RummyGame, RummyStatus
 
 from ..sessions import RummySession
-from ..text_utils import mention
+from ..text_utils import format_tournament_round_count, format_tournament_round_progress, mention
 
 
 def rummy_scoreboard_text(session: RummySession) -> str:
@@ -36,7 +36,7 @@ def _persistent_table_text(session: RummySession) -> str:
 def rummy_lobby_text(session: RummySession) -> str:
     players = "\n".join(f"- {mention(player.user_id)}" for player in session.game.players) or "Belum ada pemain."
     mode = "Tournament" if session.is_tournament else "Regular"
-    rounds = f"Jumlah ronde tournament: **{session.tournament_total_rounds} game**\n" if session.is_tournament else ""
+    rounds = f"Jumlah ronde tournament: **{format_tournament_round_count(session.tournament_total_rounds)}**\n" if session.is_tournament else ""
     return (
         "**Rummy: Lobby**\n"
         "Buat meld run atau set, lalu raih skor tertinggi.\n\n"
@@ -59,11 +59,10 @@ def rummy_state_text(session: RummySession) -> str:
         if melds
     ) or "- Belum ada meld yang diturunkan."
     actions = "\n".join(f"- {message}" for message in session.log[:4]) or "- Belum ada aksi."
-    tournament = (
-        f"Mode: **Tournament ronde {session.tournament_current_round}/{session.tournament_total_rounds}**\n"
-        if session.is_tournament
-        else ""
-    )
+    tournament = ""
+    if session.is_tournament:
+        progress = format_tournament_round_progress(session.tournament_current_round, session.tournament_total_rounds)
+        tournament = f"Mode: **Tournament ronde {progress}**\n"
     scores = f"\n\n{rummy_scoreboard_text(session)}" if session.is_tournament else ""
     required_meld = (
         f"minimal {state['required_discard_meld_size']} kartu memakai {state['required_discard_meld_card']}"

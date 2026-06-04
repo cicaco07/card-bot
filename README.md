@@ -2,7 +2,7 @@
 
 Contoh implementasi custom bot Discord untuk memainkan game kartu sederhana bersama anggota server.
 
-Versi saat ini: `1.2.1`
+Versi saat ini: `1.2.2`
 
 Command changelog:
 
@@ -233,11 +233,12 @@ Untuk tournament:
 
 ```text
 /poker-start mode:tournament rounds:3
+/poker-start mode:tournament rounds:0
 ```
 
 Beberapa tournament dapat berjalan bersamaan pada server atau channel yang sama. Setiap meja tournament menampilkan kode meja unik.
 
-`rounds` bisa diisi dari 3 sampai 20. Jika tidak memilih mode, bot memakai mode regular seperti sebelumnya.
+`rounds` bisa diisi `0` untuk endless, atau 3 sampai 20 untuk tournament dengan batas ronde. Jika tidak memilih mode, bot memakai mode regular seperti sebelumnya.
 
 Mode ini memakai kartu remi SVG dari:
 
@@ -251,7 +252,7 @@ Rules utama:
 
 - Pemain 2-4 orang.
 - Mode regular bermain 1 game.
-- Mode tournament bermain 3-20 game dengan skor akumulasi.
+- Mode tournament bermain 3-20 game atau endless dengan skor akumulasi.
 - Skor tournament per ronde: winner pertama +20, winner berikutnya +10, posisi tengah +0, loser terakhir -10.
 - Joker tidak dipakai.
 - Kartu `3` hanya menentukan first turn lalu dibuang.
@@ -281,7 +282,7 @@ Panel Remi Poker memakai tombol:
 - **Pass** untuk melewati giliran.
 - **Refresh Meja** untuk mengirim ulang panel terbaru.
 - **Vote End Game** untuk mengakhiri game jika mayoritas setuju.
-- Pada mode tournament, setelah satu ronde selesai akan muncul tombol **Mulai Ronde Berikutnya** sampai jumlah ronde terpenuhi.
+- Pada mode tournament, setelah satu ronde selesai akan muncul tombol **Mulai Ronde Berikutnya** sampai jumlah ronde terpenuhi. Untuk endless, tombol ini tetap muncul setelah checkpoint tersimpan sampai meja diarsipkan atau dihentikan manual.
 
 Jika pemain tidak beraksi sampai timer habis, bot akan menjalankan auto-pass. Jika pemain sedang membuka ronde baru dan belum ada kartu di meja, giliran pembuka akan dilewati ke pemain aktif berikutnya agar game tidak macet.
 
@@ -305,9 +306,10 @@ Untuk tournament:
 
 ```text
 /rummy-start mode:tournament rounds:3
+/rummy-start mode:tournament rounds:0
 ```
 
-Poker Tournament dan Rummy Tournament menyimpan checkpoint setelah ronde selesai. Ronde aktif yang terputus karena restart tidak dipulihkan; pemain mengulang ronde berikutnya dari checkpoint terakhir.
+Poker Tournament dan Rummy Tournament menyimpan checkpoint setelah ronde selesai. Ronde aktif yang terputus karena restart tidak dipulihkan; pemain mengulang ronde berikutnya dari checkpoint terakhir. Gunakan `rounds:0` atau dropdown **Endless** jika tournament ingin berjalan tanpa batas ronde.
 
 Command pengelolaan tournament:
 
@@ -317,7 +319,7 @@ Command pengelolaan tournament:
 /tournament-archive table_code:<kode>
 ```
 
-Panel akhir ronde tetap menyediakan tombol **Mulai Ronde Berikutnya** setelah checkpoint tersimpan.
+Panel akhir ronde tetap menyediakan tombol **Mulai Ronde Berikutnya** setelah checkpoint tersimpan. Tournament endless tidak otomatis selesai selama data ronde masih tersimpan dan meja belum diarsipkan.
 
 Rules utama:
 
@@ -336,7 +338,7 @@ Rules utama:
 - Saat flip card terjadi, pemilik kartu target dan pemilik setiap kartu di atas target yang ikut terambil mendapat maksimal satu penalti: angka -50, J/Q/K -100, Ace -150, joker -250. Pemain yang melakukan flip menerima total nilai penalti tersebut sebagai bonus. Nilai transfer mengikuti kartu **Closed Card**.
 - Hasil akhir ronde menampilkan rincian kartu pada meld terbuka, meld tertutup, deadwood, penalti flip, dan total skor normal.
 - Log aktivitas memakai simbol suit ringkas seperti `8 ♥️`.
-- Mode tournament mengakumulasi skor selama 3-20 ronde.
+- Mode tournament mengakumulasi skor selama 3-20 ronde atau endless.
 - Pada ronde pertama tournament, pemain awal dipilih acak dan giliran berjalan searah jarum jam.
 - Ronde tournament berikutnya dimulai dari pemain dengan skor kumulatif terendah. Jika seri, pemain awal dipilih acak di antara skor terendah.
 - Jika ronde sebelumnya menghasilkan penalti flip, arah ronde tournament berikutnya menjadi berlawanan arah jarum jam.

@@ -7,6 +7,17 @@ import re
 
 CHANGELOG_ENTRIES = [
     {
+        "version": "1.2.2",
+        "title": "Tournament endless berbasis checkpoint PostgreSQL",
+        "date": "2026-06-04",
+        "changes": [
+            "Menambahkan opsi tournament endless untuk Poker dan Rummy.",
+            "Menyimpan endless tournament dengan total_rounds kosong di PostgreSQL/Supabase.",
+            "Membiarkan tournament endless tetap berada di status between_rounds setelah tiap checkpoint sampai diarsipkan manual.",
+            "Menampilkan progress ronde endless pada lobby, panel game, hasil ronde, dan /tournament-list.",
+        ],
+    },
+    {
         "version": "1.2.1",
         "title": "Emoji suit publik Remi Poker",
         "date": "2026-06-04",

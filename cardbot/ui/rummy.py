@@ -155,7 +155,23 @@ class RummyModeSelect(discord.ui.Select):
 class RummyRoundSelect(discord.ui.Select):
     def __init__(self, channel_id: int) -> None:
         self.channel_id = channel_id
-        super().__init__(placeholder="Pilih jumlah ronde", options=[discord.SelectOption(label=f"{count} ronde", value=str(count)) for count in range(3, 21)])
+        session = get_rummy_session(channel_id)
+        options = [
+            discord.SelectOption(
+                label="Endless",
+                value="endless",
+                description="Lanjut terus selama checkpoint ronde tersimpan",
+                default=session.tournament_total_rounds is None,
+            ),
+        ] + [
+            discord.SelectOption(
+                label=f"{count} ronde",
+                value=str(count),
+                default=session.tournament_total_rounds == count,
+            )
+            for count in range(3, 21)
+        ]
+        super().__init__(placeholder="Pilih jumlah ronde", options=options)
 
     async def callback(self, interaction: discord.Interaction) -> None:
         try:
@@ -163,8 +179,10 @@ class RummyRoundSelect(discord.ui.Select):
             require_rummy_player(session, interaction.user.id)
             if not session.is_tournament or session.game.status != RummyStatus.WAITING:
                 raise RummyGameError("Jumlah ronde hanya bisa diubah di lobby tournament.")
-            session.tournament_total_rounds = int(self.values[0])
+            session.tournament_total_rounds = None if self.values[0] == "endless" else int(self.values[0])
             await _sync_rummy_lobby(session)
+            rounds_text = "endless" if session.tournament_total_rounds is None else str(session.tournament_total_rounds)
+            session.add_log(f"Jumlah ronde tournament diatur ke {rounds_text}.")
             await update_rummy_table_from_interaction(interaction, session)
         except RummyGameError as error:
             await reply_error(interaction, error)

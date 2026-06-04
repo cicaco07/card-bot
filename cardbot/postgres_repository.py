@@ -319,7 +319,7 @@ def _table_snapshot(
         owner_user_id=int(row["owner_user_id"]),
         game_type=str(row["game_type"]),
         status=str(row["status"]),
-        total_rounds=int(row["total_rounds"]),
+        total_rounds=int(row["total_rounds"]) if row["total_rounds"] is not None else None,
         completed_rounds=int(row["completed_rounds"]),
         settings=dict(row["settings_json"]),
         players=[

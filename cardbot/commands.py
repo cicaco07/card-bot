@@ -49,10 +49,19 @@ from .ui.uno import HandView, add_result_log, refresh_table_message, table_view
 
 
 commands_synced = False
+ENDLESS_TOURNAMENT_ROUNDS = 0
 TOURNAMENT_GAME_CHOICES = [
     app_commands.Choice(name="Poker", value="poker"),
     app_commands.Choice(name="Rummy", value="rummy"),
 ]
+
+
+def _parse_tournament_rounds(rounds: int) -> int | None:
+    if rounds == ENDLESS_TOURNAMENT_ROUNDS:
+        return None
+    if rounds < 3:
+        raise TournamentPersistenceError("Jumlah ronde tournament hanya boleh 0 untuk endless, atau 3 sampai 20.")
+    return rounds
 
 
 async def _published_changelog_versions(destination: discord.TextChannel) -> set[str]:
@@ -319,14 +328,14 @@ async def uno_play(
 @tree.command(name="poker-start", description="Tampilkan meja Remi Poker interaktif di channel ini.")
 @app_commands.describe(
     mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
-    rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+    rounds="Jumlah ronde tournament. Isi 0 untuk endless, atau 3 sampai 20.",
     table_name="Nama meja tournament agar mudah dibedakan.",
 )
 @app_commands.choices(mode=POKER_MODE_CHOICES)
 async def poker_start(
     interaction: discord.Interaction,
     mode: str = "regular",
-    rounds: app_commands.Range[int, 3, 20] = 3,
+    rounds: app_commands.Range[int, 0, 20] = 3,
     table_name: str | None = None,
 ) -> None:
     try:
@@ -339,7 +348,7 @@ async def poker_start(
             channel_id=channel_id,
             owner_id=interaction.user.id,
             mode=mode,
-            tournament_total_rounds=rounds,
+            tournament_total_rounds=_parse_tournament_rounds(rounds) if mode == "tournament" else 3,
         )
         session.game.add_player(interaction.user.id, interaction.user.display_name)
         if session.is_tournament:
@@ -402,14 +411,14 @@ async def poker_status(interaction: discord.Interaction, table_code: str | None 
 @tree.command(name="rummy-start", description="Tampilkan meja Rummy interaktif di channel ini.")
 @app_commands.describe(
     mode="Pilih regular untuk 1 game atau tournament untuk multi-round.",
-    rounds="Jumlah ronde tournament, minimal 3 dan maksimal 20.",
+    rounds="Jumlah ronde tournament. Isi 0 untuk endless, atau 3 sampai 20.",
     table_name="Nama meja tournament agar mudah dibedakan.",
 )
 @app_commands.choices(mode=RUMMY_MODE_CHOICES)
 async def rummy_start(
     interaction: discord.Interaction,
     mode: str = "regular",
-    rounds: app_commands.Range[int, 3, 20] = 3,
+    rounds: app_commands.Range[int, 0, 20] = 3,
     table_name: str | None = None,
 ) -> None:
     try:
@@ -417,7 +426,12 @@ async def rummy_start(
         existing = rummy_sessions_by_channel.get(channel_id)
         if mode == "regular" and existing and existing.game.status != RummyStatus.FINISHED:
             raise RummyGameError("Sudah ada meja Rummy aktif di channel ini.")
-        session = RummySession(channel_id, interaction.user.id, mode=mode, tournament_total_rounds=rounds)
+        session = RummySession(
+            channel_id,
+            interaction.user.id,
+            mode=mode,
+            tournament_total_rounds=_parse_tournament_rounds(rounds) if mode == "tournament" else 3,
+        )
         session.game.add_player(interaction.user.id, interaction.user.display_name)
         if session.is_tournament:
             if interaction.guild_id is None:
@@ -479,8 +493,9 @@ async def tournament_list(interaction: discord.Interaction, mode: str | None = N
             return
         rows = []
         for table in tables:
+            total_rounds = "endless" if table.total_rounds is None else str(table.total_rounds)
             checkpoint = (
-                f"checkpoint ronde {table.completed_rounds}/{table.total_rounds}"
+                f"checkpoint ronde {table.completed_rounds}/{total_rounds}"
                 if table.completed_rounds
                 else "belum memiliki checkpoint resume"
             )

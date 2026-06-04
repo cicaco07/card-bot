@@ -192,6 +192,36 @@ def test_persisted_tournament_cannot_start_next_round_before_checkpoint() -> Non
         session.start_next_tournament_round()
 
 
+def test_endless_poker_tournament_checkpoints_without_finishing() -> None:
+    async def scenario() -> None:
+        repository = FakeTournamentRepository()
+        service = TournamentService(repository)
+        session = PokerSession(channel_id=10, owner_id=1, mode="tournament", tournament_total_rounds=None)
+        session.game.add_player(1, "Alice")
+        session.game.add_player(2, "Bob")
+        await service.create_table(session, guild_id=99, game_type="poker")
+        session.tournament_current_round = 1
+        session.game.status = PokerStatus.FINISHED
+        session.game.winner_ids = [1]
+        session.game.loser_id = 2
+        session.score_finished_tournament_round()
+
+        assert session.tournament_finished is False
+        assert await service.checkpoint_round(session) is True
+        table = repository.tables[session.table_id or ""]
+        assert table.total_rounds is None
+        assert table.completed_rounds == 1
+        assert table.status == "between_rounds"
+
+        stored = await service.load_table(99, session.table_code or "")
+        resumed = resume_session(stored)
+        assert isinstance(resumed, PokerSession)
+        assert resumed.tournament_total_rounds is None
+        assert resumed.tournament_between_rounds is True
+
+    asyncio.run(scenario())
+
+
 def test_rummy_checkpoint_restores_scores_without_active_hand() -> None:
     async def scenario() -> None:
         repository = FakeTournamentRepository()

@@ -33,7 +33,7 @@ class TournamentTableSnapshot:
     owner_user_id: int
     game_type: str
     status: str
-    total_rounds: int
+    total_rounds: int | None
     completed_rounds: int
     settings: dict[str, Any] = field(default_factory=dict)
     players: list[TournamentPlayerSnapshot] = field(default_factory=list)
